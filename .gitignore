@@ -1,0 +1,30 @@
+# Xcode
+DerivedData/
+build/
+*.xcarchive
+*.ipa
+*.ipa.zip
+*.dSYM
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+
+# Signing and local configuration
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.p8
+*.cer
+*.key
+*.pem
+Signing.xcconfig
+Local.xcconfig
+
+# macOS
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+*.swp
