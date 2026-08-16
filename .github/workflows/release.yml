@@ -50,7 +50,10 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "ver=$VER" >> "$GITHUB_OUTPUT"
           echo "safe_ver=$SAFE_VER" >> "$GITHUB_OUTPUT"
-          echo "release_name=${{ github.event.inputs.release_name || TAG }}" >> "$GITHUB_OUTPUT"
+          # 用户手动触发时优先用输入框的 release_name;没填或 tag 推送则用 TAG
+          INPUT_RN="${{ github.event.inputs.release_name }}"
+          RELEASE_NAME="${INPUT_RN:-$TAG}"
+          echo "release_name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Show Xcode version
         run: |
@@ -137,7 +140,8 @@ jobs:
         with:
           name: ${{ steps.ver.outputs.release_name }}
           tag_name: ${{ steps.ver.outputs.tag }}
-          draft: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.draft || (github.event_name == 'push' && 'false' || 'true') }}
+          # tag push → 正式发布(draft=false);workflow_dispatch → 按输入框 draft 勾选(默认 true)
+          draft: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.draft }}
           prerelease: false
           generate_release_notes: true
           files: |
