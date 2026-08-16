@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "GestaltKitTool/**"
+      - "GestaltKitTool.xcodeproj/**"
+      - "GestaltKitToolTests/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "GestaltKitTool/**"
+      - "GestaltKitTool.xcodeproj/**"
+      - "GestaltKitToolTests/**"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT: GestaltKitTool.xcodeproj
+  SCHEME: GestaltKitTool
+  IOS_SIM_DEST: "platform=iOS Simulator,name=iPhone 16 Pro,OS=latest"
+  DERIVED_DATA: ${{ github.workspace }}/.build/DerivedData
+
+jobs:
+  build-and-test:
+    name: Build + Unit Tests (iOS Simulator)
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep -E "iphoneos|iphonesimulator" || true
+
+      - name: Resolve package dependencies
+        run: |
+          xcodebuild \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -resolvePackageDependencies \
+            -clonedSourcePackagesDirPath "$HOME/.swiftpm"
+
+      - name: Build for Simulator (Debug)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            build-for-testing \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination "$IOS_SIM_DEST" \
+            -configuration Debug \
+            -derivedDataPath "$DERIVED_DATA" \
+            -clonedSourcePackagesDirPath "$HOME/.swiftpm" \
+            -quiet \
+            2>&1 | tee "${RUNNER_TEMP}/build-sim.log" | xcpretty || true
+          exit ${PIPESTATUS[0]}
+
+      - name: Run Unit Tests (Simulator)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            test-without-building \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination "$IOS_SIM_DEST" \
+            -derivedDataPath "$DERIVED_DATA" \
+            -clonedSourcePackagesDirPath "$HOME/.swiftpm" \
+            -testPlan none \
+            -quiet \
+            2>&1 | tee "${RUNNER_TEMP}/test.log" | xcpretty || true
+          exit ${PIPESTATUS[0]}
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            ${{ runner.temp }}/build-sim.log
+            ${{ runner.temp }}/test.log
+            ${{ env.DERIVED_DATA }}/Logs/Build/*.xcactivitylog
+          if-no-files-found: ignore
+
+  build-release-device:
+    name: Release Build (Device, unsigned)
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve package dependencies
+        run: |
+          xcodebuild \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -resolvePackageDependencies \
+            -clonedSourcePackagesDirPath "$HOME/.swiftpm"
+
+      - name: Build for iOS Device (Release, unsigned)
+        run: |
+          set -o pipefail
+          mkdir -p "${RUNNER_TEMP}/build"
+          xcodebuild \
+            build \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath "$DERIVED_DATA" \
+            -clonedSourcePackagesDirPath "$HOME/.swiftpm" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            -quiet \
+            2>&1 | tee "${RUNNER_TEMP}/build-device.log" | xcpretty || true
+          exit ${PIPESTATUS[0]}
+
+      - name: Locate .app and show size
+        run: |
+          APP_PATH=$(find "$DERIVED_DATA/Build/Products/Release-iphoneos" -maxdepth 2 -name "GestaltKitTool.app" -type d | head -n 1)
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+          du -sh "$APP_PATH"
+          ls -la "$APP_PATH/"
+
+      - name: Create unsigned .zip (.app bundle)
+        run: |
+          OUT="${RUNNER_TEMP}/GestaltKitTool-release-unsigned.zip"
+          (cd "$(dirname "$APP_PATH")" && zip -qry "$OUT" "GestaltKitTool.app")
+          ls -lh "$OUT"
+          echo "UNSIGNED_ZIP=$OUT" >> "$GITHUB_ENV"
+
+      - name: Upload unsigned build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GestaltKitTool-release-unsigned
+          path: ${{ env.UNSIGNED_ZIP }}
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-device-logs
+          path: ${{ runner.temp }}/build-device.log
+          if-no-files-found: ignore

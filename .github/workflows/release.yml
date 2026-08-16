@@ -1,0 +1,154 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_name:
+        description: "Release display name (e.g. 1.0.3)"
+        required: false
+        type: string
+      draft:
+        description: "Create as draft release"
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT: GestaltKitTool.xcodeproj
+  SCHEME: GestaltKitTool
+  DERIVED_DATA: ${{ github.workspace }}/.build/DerivedData
+
+jobs:
+  release-build:
+    name: Build & Release (unsigned)
+    runs-on: macos-15
+    timeout-minutes: 40
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute version
+        id: ver
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="manual-${GITHUB_SHA::7}"
+          fi
+          VER="${TAG#v}"
+          SAFE_VER=$(echo "$VER" | tr '/' '_')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+          echo "safe_ver=$SAFE_VER" >> "$GITHUB_OUTPUT"
+          echo "release_name=${{ github.event.inputs.release_name || TAG }}" >> "$GITHUB_OUTPUT"
+
+      - name: Show Xcode version
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep -E "iphoneos|iphonesimulator" || true
+
+      - name: Resolve package dependencies
+        run: |
+          xcodebuild \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -resolvePackageDependencies \
+            -clonedSourcePackagesDirPath "$HOME/.swiftpm"
+
+      - name: Archive (unsigned)
+        run: |
+          set -o pipefail
+          XCPROJ_ABS="$(cd "$(dirname "$PROJECT")" && pwd)/$(basename "$PROJECT")"
+          ARCHIVE_PATH="${RUNNER_TEMP}/GestaltKitTool.xcarchive"
+          rm -rf "$ARCHIVE_PATH"
+          xcodebuild \
+            archive \
+            -project "$XCPROJ_ABS" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$ARCHIVE_PATH" \
+            -derivedDataPath "$DERIVED_DATA" \
+            -clonedSourcePackagesDirPath "$HOME/.swiftpm" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            -quiet \
+            2>&1 | tee "${RUNNER_TEMP}/archive.log" | xcpretty || true
+          exit_status=${PIPESTATUS[0]}
+          echo "ARCHIVE_PATH=$ARCHIVE_PATH" >> "$GITHUB_ENV"
+          if [[ $exit_status -ne 0 ]]; then
+            echo "::error::xcodebuild archive failed"
+            exit $exit_status
+          fi
+          ls -la "$ARCHIVE_PATH/Products/Applications/"
+
+      - name: Package unsigned .ipa (Payload zip)
+        id: pkg
+        run: |
+          APP_DIR="${ARCHIVE_PATH}/Products/Applications"
+          APP="$(ls "$APP_DIR" | grep "\.app$" | head -n 1)"
+          test -n "$APP" || { echo "::error::No .app found in archive"; exit 1; }
+          STAGE="${RUNNER_TEMP}/ipa-stage"
+          rm -rf "$STAGE" && mkdir -p "$STAGE/Payload"
+          cp -R "$APP_DIR/$APP" "$STAGE/Payload/"
+          # 确保完全无签名:移除任何可能存在的 _CodeSignature / CodeResources
+          rm -rf "$STAGE/Payload/$APP/_CodeSignature"
+          rm -f "$STAGE/Payload/$APP/embedded.mobileprovision"
+          # 纯 zip 打包:这就是标准无签名 .ipa,用户用 AltStore / 个人证书自行重签
+          IPA_NAME="GestaltKitTool-${{ steps.ver.outputs.safe_ver }}-unsigned.ipa"
+          IPA_PATH="${RUNNER_TEMP}/${IPA_NAME}"
+          (cd "$STAGE" && zip -9ry "$IPA_PATH" "Payload")
+          echo "ipa_path=$IPA_PATH" >> "$GITHUB_OUTPUT"
+          echo "ipa_name=$IPA_NAME" >> "$GITHUB_OUTPUT"
+          ls -lh "$IPA_PATH"
+
+      - name: Zip xcarchive
+        id: xcarch
+        run: |
+          XCNAME="GestaltKitTool-${{ steps.ver.outputs.safe_ver }}-xcarchive.zip"
+          XCPATH="${RUNNER_TEMP}/${XCNAME}"
+          # xcarchive 本身是目录,zip 时保持 Payload/ 结构,方便用户本地 Archive → 重新签名
+          (cd "$(dirname "$ARCHIVE_PATH")" && zip -9ry "$XCPATH" "$(basename "$ARCHIVE_PATH")")
+          echo "xcarchive_path=$XCPATH" >> "$GITHUB_OUTPUT"
+          echo "xcarchive_name=$XCNAME" >> "$GITHUB_OUTPUT"
+          ls -lh "$XCPATH"
+
+      - name: Upload build artifacts to workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: GestaltKitTool-${{ steps.ver.outputs.safe_ver }}-build-products
+          path: |
+            ${{ steps.pkg.outputs.ipa_path }}
+            ${{ steps.xcarch.outputs.xcarchive_path }}
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.ver.outputs.release_name }}
+          tag_name: ${{ steps.ver.outputs.tag }}
+          draft: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.draft || (github.event_name == 'push' && 'false' || 'true') }}
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            ${{ steps.pkg.outputs.ipa_path }}
+            ${{ steps.xcarch.outputs.xcarchive_path }}
+          fail_on_unmatched_files: true
+
+      - name: Upload archive logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: archive-logs
+          path: ${{ runner.temp }}/archive.log
+          if-no-files-found: ignore
