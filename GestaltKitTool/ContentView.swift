@@ -50,7 +50,7 @@ private struct UnsupportedOSView: View {
                 .foregroundStyle(.secondary)
             Text(String(localized: "Unsupported iOS Version"))
                 .font(.title2.weight(.semibold))
-            Text(String(localized: "GestaltKitTool currently supports only iOS 27 beta 1 through beta 4."))
+            Text(String(localized: "GestaltKitTool currently supports iOS 26.0–26.6.1 and iOS 27 beta 1–4."))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
         }

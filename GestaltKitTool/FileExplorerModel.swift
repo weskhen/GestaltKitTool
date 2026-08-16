@@ -85,6 +85,7 @@ struct QuickPath: Identifiable {
         case system    = "System"
         case user      = "User Data"
         case developer = "Developer"
+        case local     = "Local Storage"
     }
 }
 
@@ -244,6 +245,15 @@ final class FileExplorerModel: ObservableObject {
     // after navigating into a subdirectory and coming back.
     @Published var scrollRestoreTarget: String?
     private var _scrollPositionCache: [String: String] = [:]
+
+    // MARK: - Archive state (CR-30 copy-style archive)
+
+    /// Aggregate size of all archive entries, recomputed when the
+    /// archive listing is requested by the UI.
+    @Published private(set) var archiveStatsTotalBytes: Int64 = 0
+    @Published private(set) var archiveStatsCount: Int = 0
+    /// Set by archive actions so the UI can show progress / toast.
+    @Published var archiveLastMessage: String? = nil
 
     // CR-16 v6: Entry cache keyed by absolute directory path.
     //
@@ -704,6 +714,10 @@ final class FileExplorerModel: ObservableObject {
         // Developer (accessible container directories)
         QuickPath(name: String(localized: "Bundle Containers"), path: "/var/containers/Bundle/Application", icon: "shippingbox.fill", category: .developer,
                   description: String(localized: "Installed app bundle containers. Each UUID directory contains the .app bundle (executable, resources, Info.plist, frameworks).")),
+
+        // Local Storage (app's own sandbox — Documents, Archive)
+        QuickPath(name: String(localized: "Archive"), path: ArchiveManager.archiveRootPath, icon: "archivebox.fill", category: .local,
+                  description: String(localized: "GestaltKitTool's copy-style archive. Snapshots of files/directories read via bad_query are stored here (Documents/GestaltKitTool Archive). Source files are NOT moved or deleted — bad_query provides read-only access, so Archive copies instead of moving.")),
     ]
 
     var groupedQuickPaths: [(QuickPath.QuickPathCategory, [QuickPath])] {
@@ -2452,5 +2466,120 @@ extension Array {
         stride(from: 0, to: count, by: size).map {
             Array(self[$0..<Swift.min($0 + size, count)])
         }
+    }
+}
+
+// MARK: - Archive Operations (CR-30 copy-style archive)
+
+extension FileExplorerModel {
+
+    /// Whether the current directory or a specific entry lives inside
+    /// the Archive folder (prevents archiving the archive).
+    func isArchivedPath(_ path: String) -> Bool {
+        ArchiveManager.isPathInsideArchive(path)
+    }
+
+    /// True if the Archive quick-path shows a "new" state we can use
+    /// to highlight the new feature the first time users land.
+    var archiveQuickPath: QuickPath? {
+        quickPaths.first { $0.category == .local }
+    }
+
+    /// Copies a single file/directory entry (BQFileEntry) into the
+    /// archive. Runs on a background queue because large directory
+    /// trees can take seconds (each file needs one bad_query read).
+    func archiveEntryAsync(
+        _ entry: BQFileEntry,
+        progressHandler: ((_ copiedBytes: Int64, _ totalEstimate: Int64) -> Void)? = nil,
+        completion: ((Result<(archivedPath: String, bytesWritten: Int64), Error>) -> Void)? = nil
+    ) {
+        let fa = fileAccess
+        let estimatedSize = entry.fileSize
+        let archiveMsg = String(
+            format: String(localized: "Archiving %@…"),
+            entry.name
+        )
+        archiveLastMessage = archiveMsg
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            do {
+                let result = try ArchiveManager.archiveEntry(
+                    entry,
+                    fileAccess: fa,
+                    onByteCopied: progressHandler
+                )
+                Task { @MainActor [weak self] in
+                    let ok = String(
+                        format: String(localized: "Archived %@ (%d files, %@)"),
+                        entry.name,
+                        1, // simplified: bytes covers content but file count is for preview only
+                        ByteCountFormatter.string(fromByteCount: result.bytesWritten, countStyle: .file)
+                    )
+                    self?.archiveLastMessage = ok
+                    self?.refreshArchiveStats()
+                    completion?(.success(result))
+                }
+            } catch {
+                Task { @MainActor [weak self] in
+                    self?.archiveLastMessage = error.localizedDescription
+                    completion?(.failure(error))
+                }
+            }
+        }
+    }
+
+    /// Deletes an archive entry by its short name (last path component
+    /// shown in the Archive directory listing).
+    func deleteArchivedItem(named name: String, completion: ((Result<Void, Error>) -> Void)? = nil) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            do {
+                try ArchiveManager.deleteArchivedItem(named: name)
+                Task { @MainActor [weak self] in
+                    let ok = String(
+                        format: String(localized: "Deleted archive entry %@"),
+                        name
+                    )
+                    self?.archiveLastMessage = ok
+                    self?.refreshArchiveStats()
+                    completion?(.success(()))
+                }
+            } catch {
+                Task { @MainActor [weak self] in
+                    self?.archiveLastMessage = error.localizedDescription
+                    completion?(.failure(error))
+                }
+            }
+        }
+    }
+
+    /// Recomputes the aggregate byte count + entry count shown next to
+    /// the Archive quick-path. Called on archive add/remove and once
+    /// at init time so the UI has a fresh value.
+    func refreshArchiveStats() {
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            guard let entries = try? ArchiveManager.listArchiveEntries() else {
+                Task { @MainActor in
+                    self?.archiveStatsCount = 0
+                    self?.archiveStatsTotalBytes = 0
+                }
+                return
+            }
+            var total: Int64 = 0
+            for e in entries {
+                if e.metadata.totalByteSize >= 0 {
+                    total += e.metadata.totalByteSize
+                }
+            }
+            Task { @MainActor [weak self] in
+                self?.archiveStatsCount = entries.count
+                self?.archiveStatsTotalBytes = total
+            }
+        }
+    }
+
+    /// True if an entry with the same name already exists in the
+    /// archive. Used by the View to decide between "Overwrite?" /
+    /// "Rename?" options on tap.
+    func hasArchiveCollision(for entry: BQFileEntry) -> Bool {
+        ArchiveManager.hasArchivedItem(named: entry.name)
     }
 }

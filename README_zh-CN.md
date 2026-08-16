@@ -51,12 +51,17 @@ GestaltKitTool 是一款原生 SwiftUI 编写的 MobileGestalt 工具，直接�
 
 ## 环境要求与签名
 
-- 支持的系统版本：仅 iOS 27 beta 1 至 beta 4
+- 支持的系统版本：iOS 26.0–26.6.1 与 iOS 27 beta 1 至 beta 4
 - Xcode 及可将 App 安装到目标设备的签名方式
 - 设备需开启开发者模式
 - Bundle identifier：`com.wesk.vtool`
 
-GestaltKitTool 在访问 MobileGestalt 前会检查当前系统构建号。当前发行版仅接受 iOS 27 beta 1–4（24A5355q、24A5370h、24A5380h、24A5390f）。Apple 可能随时更改这些私有行为。
+GestaltKitTool 在访问 MobileGestalt 前会检查当前系统版本。当前发行版接受 iOS 26.0–26.6.1（bad_query 原作者声明支持范围），以及 iOS 27 beta 1–4（24A5355q、24A5370h、24A5380h、24A5390f）。iOS 27 仍处于 beta 阶段，保留精确构建号白名单以避免未测试版本意外运行。
+
+> [!NOTE]
+> iOS 26 支持基于 bad_query 作者声明，未在所有 26.x 版本上充分测试。建议用户反馈实际兼容性，如未来 Apple 修复 bad_query 会及时调整支持范围。
+
+Apple 可能随时更改这些私有行为。
 
 ## 编译
 

@@ -53,12 +53,17 @@ Presets follow Nugget's staged-apply model: toggles represent changes for the ne
 
 ## Requirements and signing
 
-- Supported system versions: iOS 27 beta 1 through beta 4 only
+- Supported system versions: iOS 26.0–26.6.1 and iOS 27 beta 1 through beta 4
 - Xcode and a signing method that can install apps on the target device
 - Developer Mode enabled on the device
 - Bundle identifier: `com.wesk.vtool`
 
-GestaltKitTool checks the running system build before accessing MobileGestalt. The current release accepts only iOS 27 beta 1–4 (24A5355q, 24A5370h, 24A5380h, and 24A5390f). Apple may change these private behaviors at any time.
+GestaltKitTool checks the running system version before accessing MobileGestalt. The current release accepts iOS 26.0–26.6.1 (the version range declared as supported by the bad_query author), plus iOS 27 beta 1–4 (24A5355q, 24A5370h, 24A5380h, and 24A5390f). iOS 27 is still in beta, so an exact build whitelist is retained to prevent untested builds from running accidentally.
+
+> [!NOTE]
+> iOS 26 support is based on the bad_query author's declaration and has not been exhaustively tested on every 26.x release. User feedback on actual compatibility is welcome. If Apple patches bad_query in the future, the supported range will be adjusted accordingly.
+
+Apple may change these private behaviors at any time.
 
 ## Building
 

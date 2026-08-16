@@ -169,12 +169,22 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
     NSOperatingSystemVersion version = NSProcessInfo.processInfo.operatingSystemVersion;
     NSString *build = self.currentOSBuild;
 
-    return version.majorVersion == 27 && (
-        [build isEqualToString:@"24A5355q"] || // iOS 27 beta 1
-        [build isEqualToString:@"24A5370h"] || // iOS 27 beta 2
-        [build isEqualToString:@"24A5380h"] || // iOS 27 beta 3
-        [build isEqualToString:@"24A5390f"]    // iOS 27 beta 4
-    );
+    // bad_query 原作者声明支持 iOS 26.0 - 26.6.1 / 27.0b4。
+    // 注意:iOS 26 支持基于作者声明,未在所有版本上充分测试。
+    // 建议用户反馈实际兼容性,如未来 Apple 修复 bad_query 会及时调整。
+    if (version.majorVersion == 26) {
+        if (version.minorVersion > 6) return NO;
+        if (version.minorVersion == 6 && version.patchVersion > 1) return NO;
+        return YES;
+    }
+    // iOS 27 仍在 beta 阶段,保留精确 build 白名单以避免未测试版本意外运行。
+    if (version.majorVersion == 27) {
+        return [build isEqualToString:@"24A5355q"] || // iOS 27 beta 1
+               [build isEqualToString:@"24A5370h"] || // iOS 27 beta 2
+               [build isEqualToString:@"24A5380h"] || // iOS 27 beta 3
+               [build isEqualToString:@"24A5390f"];    // iOS 27 beta 4
+    }
+    return NO;
 }
 
 #pragma mark - Connection
@@ -234,7 +244,7 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
     dispatch_sync(_stateQueue, ^{
         if (!GestaltAccess.isRunningSupportedOS) {
             blockError = GestaltError(0, NSLocalizedString(
-                @"GestaltKitTool currently supports only iOS 27 beta 1 through beta 4.", nil));
+                @"GestaltKitTool currently supports iOS 26.0–26.6.1 and iOS 27 beta 1–4.", nil));
             result = NO;
             return;
         }

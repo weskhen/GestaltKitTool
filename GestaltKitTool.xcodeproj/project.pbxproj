@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		D13AF45B302AF55100CE898D /* icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = D13AF45A302AF55100CE898D /* icon.icon */; };
-		492AAC1D675A41CFA16BD40C /* GKTLLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3199D83363E4ABB90C017AD /* GKTLLog.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,7 +24,6 @@
 		000000000000000000000120 /* GestaltKitTool.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GestaltKitTool.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000000130 /* GestaltKitToolTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GestaltKitToolTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D13AF45A302AF55100CE898D /* icon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = icon.icon; sourceTree = "<group>"; };
-		F3199D83363E4ABB90C017AD /* GKTLLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GKTLLog.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */

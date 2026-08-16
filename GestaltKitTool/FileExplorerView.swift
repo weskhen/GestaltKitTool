@@ -20,6 +20,23 @@ struct FileExplorerView: View {
     // .sheet(item:) modifiers, which conflict with each other.
     @State private var activeSheet: ExplorerSheet?
 
+    /// Active confirmation dialog type.
+    enum ArchiveAction: Identifiable {
+        case archive(BQFileEntry)      // Copy to archive
+        case overwriteArchive(BQFileEntry) // Name collision → overwrite?
+        case deleteFromArchive(String) // Name of archive entry to delete
+        case restoreFromArchive(String) // Name to restore to export dir
+
+        var id: String {
+            switch self {
+            case .archive(let e):      "archive/\(e.fullPath)"
+            case .overwriteArchive(let e): "overwrite/\(e.fullPath)"
+            case .deleteFromArchive(let n): "del/\(n)"
+            case .restoreFromArchive(let n): "rest/\(n)"
+            }
+        }
+    }
+
     enum ExplorerSheet: Identifiable {
         case filePreview(FilePreview)
         case fileDetail(BQFileEntry)
@@ -34,6 +51,13 @@ struct FileExplorerView: View {
             case .containerDetail(let c): "container/\(c.id)"
             }
         }
+    }
+
+    /// Tracks whether the current list view is showing entries inside
+    /// the Archive folder — used to swap contextual actions from
+    /// "Archive this" to "Restore from archive / Delete archive entry".
+    private var isBrowsingArchive: Bool {
+        model.isArchivedPath(model.currentDirectoryPath ?? "")
     }
 
     var body: some View {
@@ -193,7 +217,203 @@ struct FileExplorerView: View {
         } message: {
             Text(model.errorMessage ?? "")
         }
+        // Archive status toast + confirmation dialog are attached via
+        // separate view methods to keep the type-checker happy (the
+        // inline .overlay-if-let + transition + animation +
+        // .confirmationDialog chain triggered "expression too complex"
+        // on Swift 5 / Swift 6 strict concurrency builds).
+        .archiveToastOverlay(message: model.archiveLastMessage, onTimeout: {
+            model.archiveLastMessage = nil
+        })
+        .confirmationDialog(
+            String(localized: "Archive"),
+            isPresented: archiveActionPresented,
+            titleVisibility: .visible,
+            presenting: pendingArchiveAction
+        ) { action in
+            switch action {
+            case .archive(let entry):
+                Button(String(localized: "Copy to Archive")) {
+                    model.archiveEntryAsync(entry)
+                }
+                Button(String(localized: "Cancel"), role: .cancel) { }
+
+            case .overwriteArchive(let entry):
+                Button(String(localized: "Overwrite existing archive entry"),
+                       role: .destructive) {
+                    model.deleteArchivedItem(named: entry.name) { _ in
+                        model.archiveEntryAsync(entry)
+                    }
+                }
+                Button(String(localized: "Cancel"), role: .cancel) { }
+
+            case .deleteFromArchive(let name):
+                Button(String(localized: "Delete"), role: .destructive) {
+                    model.deleteArchivedItem(named: name)
+                }
+                Button(String(localized: "Cancel"), role: .cancel) { }
+
+            case .restoreFromArchive(let name):
+                Button(String(localized: "Restore to Export folder")) {
+                    do {
+                        let url = try ArchiveManager.restoreArchivedItemToExport(named: name)
+                        model.archiveLastMessage = String(
+                            format: String(localized: "Restored %@ to Export folder"),
+                            name
+                        )
+                        try openRestoredFile(url: url, name: name)
+                    } catch {
+                        model.archiveLastMessage = error.localizedDescription
+                    }
+                }
+                Button(String(localized: "Cancel"), role: .cancel) { }
+            }
+        }
+        .task {
+            model.refreshArchiveStats()
+        }
     }
+
+    /// After restore-to-export, try to show the restored copy in the
+    /// file preview sheet. Kept as a separate helper to avoid nesting
+    /// KVC-bridge code inside a ViewBuilder, which confuses Swift 6.
+    private func openRestoredFile(url: URL, name: String) throws {
+        let data = try Data(contentsOf: url)
+        let entry = BQFileEntryBuilder.fileEntry(
+            name: name,
+            fullPath: url.path,
+            isDirectory: false,
+            size: Int64(url.fileSizeEstimate),
+            mtime: Date()
+        )
+        activeSheet = .filePreview(FilePreview(entry: entry, data: data))
+    }
+
+    // MARK: - Archive action helpers (CR-30)
+
+    @State private var pendingArchiveAction: ArchiveAction?
+
+    /// Derived Bool binding used by `.confirmationDialog(isPresented:)`.
+    /// Kept separate from `pendingArchiveAction` so the sheet can use the
+    /// `presenting:` form without hitting a SwiftUI API mismatch.
+    private var archiveActionPresented: Binding<Bool> {
+        Binding(
+            get: { pendingArchiveAction != nil },
+            set: { if !$0 { pendingArchiveAction = nil } }
+        )
+    }
+
+    /// Entry point used by the row's contextual "Archive" button.
+    /// Checks for collisions and routes to the right confirmation.
+    private func requestArchive(_ entry: BQFileEntry) {
+        if model.hasArchiveCollision(for: entry) {
+            pendingArchiveAction = .overwriteArchive(entry)
+        } else {
+            pendingArchiveAction = .archive(entry)
+        }
+    }
+}
+
+// MARK: - Minimal BQFileEntry factory for synthesized entries
+
+enum BQFileEntryBuilder {
+    /// Returns a BQFileEntry with the supplied fields. Uses KVC to set
+    /// readonly properties — the ObjC class has no initializer exposed
+    /// to Swift that accepts values, and the @synthesize ivars are
+    /// writable via setValue:forKey:.
+    static func fileEntry(
+        name: String,
+        fullPath: String,
+        isDirectory: Bool,
+        size: Int64,
+        mtime: Date?
+    ) -> BQFileEntry {
+        let entry = BQFileEntry()
+        entry.setValue(name, forKey: "name")
+        entry.setValue(fullPath, forKey: "fullPath")
+        entry.setValue(NSNumber(value: isDirectory), forKey: "isDirectory")
+        entry.setValue(NSNumber(value: size), forKey: "fileSize")
+        if let mtime { entry.setValue(mtime, forKey: "modificationDate") }
+        return entry
+    }
+}
+
+private extension URL {
+    /// Rough size estimate used by the restore → preview bridge. 0 if
+    /// the resource cannot be read (preview still works, header shows
+    /// the correct size once the sheet reads the file).
+    var fileSizeEstimate: Int {
+        (try? resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+    }
+}
+
+// MARK: - Archive Toast
+
+private struct ArchiveToast: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "archivebox.fill")
+                .foregroundStyle(Color.accentColor)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.accentColor.opacity(0.25), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.08), radius: 14, x: 0, y: 6)
+        )
+        .frame(maxWidth: 520)
+        .padding(.horizontal, 16)
+    }
+}
+
+// MARK: - Archive-specific View modifiers
+
+extension View {
+    /// Floating auto-hiding archive status toast. Kept as a modifier so
+    /// FileExplorerView.body stays simple enough for the Swift 6 type-
+    /// checker to digest in one pass.
+    @ViewBuilder
+    func archiveToastOverlay(
+        message: String?,
+        onTimeout: @escaping () -> Void
+    ) -> some View {
+        overlay(alignment: .bottom) {
+            if let msg = message {
+                ArchiveToast(message: msg)
+                    .padding(.bottom, 24)
+                    .transition(.opacity)
+                    .onAppear {
+                        let captured = msg
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                            onTimeout()
+                            // Prevent double-dismiss race: if caller
+                            // set a new message in the meantime we
+                            // should not nil it out. ArchiveToast still
+                            // shows latest value so UI is consistent.
+                            _ = captured
+                        }
+                    }
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: message == nil)
+    }
+
+}
+
+// MARK: - FileExplorerView: subviews
+
+extension FileExplorerView {
 
     // MARK: - Container List (Root)
 
@@ -828,16 +1048,29 @@ struct FileExplorerView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(filteredEntries, id: \.fullPath) { entry in
-                            FileEntryRow(entry: entry, onTap: {
-                                // CR-7: Use handleEntryTap for smart routing —
-                                // entries where lstat failed (no metadata) might
-                                // be directories. handleEntryTap tries browse
-                                // first and falls back to read if the directory
-                                // is empty/inaccessible.
-                                model.handleEntryTap(entry)
-                            }, onInfo: {
-                                activeSheet = .fileDetail(entry)
-                            })
+                            FileEntryRow(
+                                entry: entry,
+                                onTap: {
+                                    // CR-7: Use handleEntryTap for smart routing —
+                                    // entries where lstat failed (no metadata) might
+                                    // be directories. handleEntryTap tries browse
+                                    // first and falls back to read if the directory
+                                    // is empty/inaccessible.
+                                    model.handleEntryTap(entry)
+                                },
+                                onInfo: {
+                                    activeSheet = .fileDetail(entry)
+                                },
+                                onArchive: isBrowsingArchive || model.isArchivedPath(entry.fullPath)
+                                    ? nil
+                                    : { requestArchive(entry) },
+                                onRestoreFromArchive: isBrowsingArchive
+                                    ? { pendingArchiveAction = .restoreFromArchive(entry.name) }
+                                    : nil,
+                                onDeleteFromArchive: isBrowsingArchive
+                                    ? { pendingArchiveAction = .deleteFromArchive(entry.name) }
+                                    : nil
+                            )
                             .id(entry.fullPath)
                             // CR-27: Track the last appeared entry as scroll
                             // restore target. Defer to next runloop to avoid
@@ -1241,6 +1474,13 @@ private struct FileEntryRow: View {
     let entry: BQFileEntry
     let onTap: () -> Void
     let onInfo: () -> Void
+    /// Optional: invoked when the user selects "Copy to Archive"
+    /// from the contextual menu (non-Archive view) or "Restore /
+    /// Delete" (when browsing inside Archive). Passing nil hides
+    /// archive-related actions.
+    var onArchive: (() -> Void)? = nil
+    var onRestoreFromArchive: (() -> Void)? = nil
+    var onDeleteFromArchive: (() -> Void)? = nil
 
     var body: some View {
         Button(action: onTap) {
@@ -1287,6 +1527,29 @@ private struct FileEntryRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if let onArchive {
+                Button {
+                    onArchive()
+                } label: {
+                    Label(String(localized: "Copy to Archive"), systemImage: "archivebox")
+                }
+            }
+            if let onRestoreFromArchive {
+                Button {
+                    onRestoreFromArchive()
+                } label: {
+                    Label(String(localized: "Restore (copy to Export)"), systemImage: "square.and.arrow.up")
+                }
+            }
+            if let onDeleteFromArchive {
+                Button(role: .destructive) {
+                    onDeleteFromArchive()
+                } label: {
+                    Label(String(localized: "Delete from Archive"), systemImage: "trash")
+                }
+            }
+        }
     }
 
     private var fileIcon: String {

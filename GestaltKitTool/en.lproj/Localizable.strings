@@ -469,3 +469,17 @@
 "Apply and Write" = "Apply and Write";
 "The patch's CacheExtra fields will be merged onto the current plist. A backup is created automatically before writing. SpringBoard will refresh after writing." = "The patch's CacheExtra fields will be merged onto the current plist. A backup is created automatically before writing. SpringBoard will refresh after writing.";
 
+/* ── Archive (CR-30 copy-style archive, bad_query is read-only) ───── */
+"Local Storage" = "Local Storage";
+"GestaltKitTool's copy-style archive. Snapshots of files/directories read via bad_query are stored here (Documents/GestaltKitTool Archive). Source files are NOT moved or deleted — bad_query provides read-only access, so Archive copies instead of moving." = "GestaltKitTool's copy-style archive. Snapshots of files/directories read via bad_query are stored here (Documents/GestaltKitTool Archive). Source files are NOT moved or deleted — bad_query provides read-only access, so Archive copies instead of moving.";
+"Copy to Archive" = "Copy to Archive";
+"Overwrite existing archive entry" = "Overwrite existing archive entry";
+"Restore (copy to Export)" = "Restore (copy to Export)";
+"Delete from Archive" = "Delete from Archive";
+"Archiving %@…" = "Archiving %@…";
+"Archived %@ (%d files, %@)" = "Archived %@ (%d files, %@)";
+"Deleted archive entry %@" = "Deleted archive entry %@";
+"Restored %@ to Export folder" = "Restored %@ to Export folder";
+"Delete" = "Delete";
+"Cancel" = "Cancel";
+

@@ -15,8 +15,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (instancetype)shared;
 
-/// Returns whether this process is running on an iOS 27 build that GestaltKitTool
-/// currently supports (developer beta 1 through beta 4).
+/// Returns whether this process is running on an iOS build that GestaltKitTool
+/// currently supports (iOS 26.0–26.6.1, or iOS 27 beta 1 through beta 4).
 + (BOOL)isRunningSupportedOS;
 
 /// The Darwin build identifier used by the supported-OS check, such as

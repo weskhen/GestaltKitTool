@@ -469,3 +469,17 @@
 "Apply and Write" = "应用并写入";
 "The patch's CacheExtra fields will be merged onto the current plist. A backup is created automatically before writing. SpringBoard will refresh after writing." = "补丁的 CacheExtra 字段会合并到当前 plist，写入前自动备份，完成后 SpringBoard 会自动刷新。";
 
+/* ── Archive (CR-30 复制式归档, bad_query 仅提供只读访问) ────────── */
+"Local Storage" = "本地存储";
+"GestaltKitTool's copy-style archive. Snapshots of files/directories read via bad_query are stored here (Documents/GestaltKitTool Archive). Source files are NOT moved or deleted — bad_query provides read-only access, so Archive copies instead of moving." = "GestaltKitTool 的复制式归档。通过 bad_query 读取的文件/目录快照保存在这里 (Documents/GestaltKitTool Archive)。源文件不会被移动或删除——bad_query 仅提供只读访问,因此归档采用复制而非移动方式。";
+"Copy to Archive" = "复制到归档";
+"Overwrite existing archive entry" = "覆盖已有归档项";
+"Restore (copy to Export)" = "恢复(复制到导出)";
+"Delete from Archive" = "从归档删除";
+"Archiving %@…" = "正在归档 %@…";
+"Archived %@ (%d files, %@)" = "已归档 %@(%d 项, %@)";
+"Deleted archive entry %@" = "已删除归档项 %@";
+"Restored %@ to Export folder" = "已恢复 %@ 到导出目录";
+"Delete" = "删除";
+"Cancel" = "取消";
+
