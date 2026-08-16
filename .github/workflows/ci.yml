@@ -35,7 +35,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Show Xcode version
         run: |
@@ -82,7 +82,7 @@ jobs:
 
       - name: Upload build logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-logs
           path: |
@@ -98,7 +98,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Resolve package dependencies
         run: |
@@ -142,14 +142,14 @@ jobs:
           echo "UNSIGNED_ZIP=$OUT" >> "$GITHUB_ENV"
 
       - name: Upload unsigned build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: GestaltKitTool-release-unsigned
           path: ${{ env.UNSIGNED_ZIP }}
 
       - name: Upload build logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-device-logs
           path: ${{ runner.temp }}/build-device.log
