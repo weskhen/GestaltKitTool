@@ -2,18 +2,13 @@
 
 English | [简体中文](./README_zh-CN.md)
 
-> Project renamed from **WeskTool** to **GestaltKitTool** as of this revision. The
-> bundle identifier `com.wesk.vtool` is intentionally preserved so that existing
-> installations upgrade in place (retaining the local Backup/Patch library and any
-> already-written MobileGestalt state).
+> Project renamed from **WeskTool** to **GestaltKitTool** as of this revision. Bundle identifier `com.wesk.vtool` is preserved so existing installations upgrade in place, retaining the local Backup/Patch library and written MobileGestalt state.
 
-GestaltKitTool is a native SwiftUI MobileGestalt utility that runs directly on iPhone. It reads the device's `com.apple.MobileGestalt.plist` and provides common capability presets, a complete field editor, backup/import/restore workflows, cross-app sandbox file browsing, and system file inspection — all powered by the `bad_query` sandbox escape.
+GestaltKitTool is a SwiftUI MobileGestalt utility for iPhone. It reads `com.apple.MobileGestalt.plist` and provides capability presets, field editing, backup/import/restore, cross-app sandbox file browsing, and system file inspection. All file access outside the app sandbox uses the `bad_query` sandbox escape.
 
-> [!WARNING]
-> This project uses private APIs and modifies system cache data. Incorrect MobileGestalt values can break system features or UI behavior and may require restoring the device. Use it only on devices you own or are authorized to manage.
+> **WARNING**: This project uses private APIs and modifies system cache data. Incorrect MobileGestalt values can break system features or UI and may require a device restore. Use only on devices you own or are authorized to manage.
 
-> [!NOTE]
-> GestaltKitTool does not install a jailbreak, Bootstrap, or persistent daemons, and does not inject code into third-party apps, so it is not detected as a jailbreak.
+> **NOTE**: GestaltKitTool does not install a jailbreak, Bootstrap, or persistent daemons, and does not inject code into third-party apps. It is not detected as a jailbreak.
 
 ## Features
 
@@ -21,53 +16,54 @@ GestaltKitTool is a native SwiftUI MobileGestalt utility that runs directly on i
 
 - Dynamic Island device subtypes and the alternate support flag
 - Device model name shown in About
-- Boot/shutdown chime, charge limit, tap to wake, and Camera Control settings
-- Apple Pencil, Action Button, and Collision SOS settings
-- Always-On Display, AOD vibrancy, wallpaper parallax, and Liquid Glass low-performance mode
-- Stage Manager, iPad app compatibility, and Nugget's iPadOS `CacheData` patch
-- Siri AI US region, Apple internal install, internal storage, and Security Research Device mode
-- Advanced field editor: search and edit String, Integer, Float, Boolean, Data, Array, and Dictionary values in `CacheExtra` and at the plist top level
-- Backup library: manually back up, import, export, restore, and delete local backups with pre-write verification
+- Boot/shutdown chime, charge limit, tap to wake, Camera Control
+- Apple Pencil, Action Button, Collision SOS settings
+- Always-On Display, AOD vibrancy, wallpaper parallax, Liquid Glass low-performance mode
+- Stage Manager, iPad app compatibility, Nugget's iPadOS `CacheData` patch
+- Siri AI US region, Apple internal install, internal storage, Security Research Device mode
+- Field editor: search and edit String, Integer, Float, Boolean, Data, Array, and Dictionary values in `CacheExtra` and at the plist top level
+- Backup library: back up, import, export, restore, and delete local backups with pre-write verification
+- One-tap app backup: back up any app's entire data container to GestaltKitTool's private container
 
-Presets follow Nugget's staged-apply model: toggles represent changes for the next write, and all selected changes are committed with the bottom Apply button. Selections are cleared after a successful write. Options that write conflicting values are mutually exclusive. After a successful write or restore, GestaltKitTool automatically refreshes SpringBoard so changes take effect.
+Presets follow Nugget's staged-apply model. Toggles represent changes for the next write, and all selected changes are committed via the Apply button at the bottom. Selections are cleared after a successful write. Options writing conflicting values are mutually exclusive. After a successful write or restore, SpringBoard is automatically refreshed.
 
 ### Explorer tab
 
-- Discover and browse all app data containers, app group containers, and system group containers on the device
+- Browse all app data containers, app group containers, and system group containers
 - `bad_query` bypasses the sandbox to list and read files from any app's private data container
-- Navigate directories with breadcrumb trail, bookmark favorite paths, and enter custom absolute paths
-- File preview with automatic type detection: property list (tree view), JSON (pretty-printed), text, image (PNG/JPEG/HEIC), hex dump, and binary
-- Recursive search across directories with incremental results and cancellation support
+- Navigate via breadcrumb trail, bookmark favorite paths, enter custom absolute paths
+- File preview with type detection: property list (tree view), JSON (pretty-printed), text, image (PNG/JPEG/HEIC), hex dump, binary
+- Recursive directory search with incremental results and cancellation
+- Batch file operations: multi-select delete, move, export
 
 ### Inspector tab
 
-- Inspect sensitive system files that demonstrate the full impact of the `bad_query` sandbox escape
-- 10 target files across 6 categories: Identity & Gestalt, System Containers, App Sandboxes, Bundle Containers, Network Configuration, and System Information
+- Reads sensitive system files to demonstrate the scope of the `bad_query` sandbox escape
+- 10 target files across 6 categories: Identity & Gestalt, System Containers, App Sandboxes, Bundle Containers, Network Configuration, System Information
 - Property list tree browser with key-value inspection
 - Export read results for further analysis
 
 ### Settings tab
 
-- Language switching between English and Simplified Chinese (follows system by default)
-- Diagnostics panel with 5 tests: bad_query availability, sandbox lease, container discovery, file read, and directory listing
+- Language switching: English / Simplified Chinese (follows system by default)
+- Diagnostics panel with 6 tests: bad_query availability, sandbox lease, container discovery, file read, directory listing, MobileGestalt write probe
+- Safe Cleanup: scan and clear app cache/tmp directories to free disk space
+- First-launch onboarding with 3 steps
 
 ## Requirements and signing
 
-- Supported system versions: iOS 26.0–26.6.1 and iOS 27 beta 1 through beta 4
+- Supported systems: iOS 26.0–26.6.1, iOS 27 beta 1 through beta 4
 - Xcode and a signing method that can install apps on the target device
 - Developer Mode enabled on the device
 - Bundle identifier: `com.wesk.vtool`
 
-GestaltKitTool checks the running system version before accessing MobileGestalt. The current release accepts iOS 26.0–26.6.1 (the version range declared as supported by the bad_query author), plus iOS 27 beta 1–4 (24A5355q, 24A5370h, 24A5380h, and 24A5390f). iOS 27 is still in beta, so an exact build whitelist is retained to prevent untested builds from running accidentally.
-
-> [!NOTE]
-> iOS 26 support is based on the bad_query author's declaration and has not been exhaustively tested on every 26.x release. User feedback on actual compatibility is welcome. If Apple patches bad_query in the future, the supported range will be adjusted accordingly.
+GestaltKitTool checks the running system version before accessing MobileGestalt. iOS 26 support is based on the bad_query author's declaration and has not been tested on every 26.x release. iOS 27 beta retains an exact build whitelist (24A5355q, 24A5370h, 24A5380h, 24A5390f) to prevent untested builds from running. If Apple patches bad_query in the future, the supported range will be adjusted accordingly.
 
 Apple may change these private behaviors at any time.
 
 ## Building
 
-Open `GestaltKitTool.xcodeproj` in Xcode, select your own development team for the target, and build. You can also build from the command line:
+Open `GestaltKitTool.xcodeproj` in Xcode, select your development team for the target, and build. Command line:
 
 ```sh
 xcodebuild \
@@ -79,7 +75,7 @@ xcodebuild \
   build
 ```
 
-To validate the source without signing:
+Validate source without signing:
 
 ```sh
 xcodebuild \
@@ -92,34 +88,30 @@ xcodebuild \
   build
 ```
 
-> **Note on the scheme name:** The Xcode scheme is still called `WeskTool` because the scheme
-> name mirrors the Xcode target name, which we keep stable (so `SWIFT_OBJC_BRIDGING_HEADER`
-> paths, Xcode target uuids, and `TEST_HOST` references remain internally consistent). Only
-> the **displayed product name** (`PRODUCT_NAME` / `CFBundleDisplayName`) and the **project
-> file name** (`GestaltKitTool.xcodeproj`) were renamed.
+> **Scheme name note**: The Xcode scheme is still called `WeskTool` to keep `SWIFT_OBJC_BRIDGING_HEADER` paths, target UUIDs, and `TEST_HOST` references internally stable. Only the displayed product name (`PRODUCT_NAME` / `CFBundleDisplayName`) and project file name were renamed.
 
-IPA files, certificates, provisioning profiles, development team identifiers, and local Xcode user data are intentionally excluded from the repository.
+IPA files, certificates, provisioning profiles, development team identifiers, and local Xcode user data are excluded from the repository.
 
 ## Usage
 
-1. Install and open GestaltKitTool, then wait for it to read MobileGestalt.
-2. Use the **MobileGestalt** tab for capability presets, advanced field editing, and backup management.
-3. Use the **Explorer** tab to browse any app's sandbox or arbitrary device paths.
+1. Install and open GestaltKitTool; wait for it to read MobileGestalt.
+2. Use the **MobileGestalt** tab for presets, field editing, and backup management.
+3. Use the **Explorer** tab to browse app sandboxes or arbitrary device paths.
 4. Use the **Inspector** tab to inspect sensitive system files.
 5. Use the **Settings** tab to switch language or run diagnostics.
-6. After a successful write or restore, GestaltKitTool automatically refreshes SpringBoard so the changes take effect.
+6. After a successful write or restore, SpringBoard is automatically refreshed.
 
 ## Credits
 
-- [Nugget](https://github.com/leminlimez/Nugget) — MobileGestalt presets and the iPadOS `CacheData` approach
-- [FilzaSlop](https://github.com/0xjohnnydev/FilzaSlop) — ContainerManager file-access research
-- [bad_query](https://github.com/forcequitOS/bad_query) — path-based ContainerManager sandbox escape
-- [0xJohnny](https://x.com/0xjohnny) — MobileHouseArrest / ContainerManager proof of concept
-- [neospring](https://github.com/rooootdev/neospring) — WebKit respring implementation
-- [GestaltEdit](https://github.com/frs0n/GestaltEdit) — The MobileGestalt tab is built on this project
-- [FilzaJailedDS](https://github.com/34306/FilzaJailedDS) — Sandbox-escape verification and write-hardening patterns
+- [Nugget](https://github.com/leminlimez/Nugget) — MobileGestalt presets and iPadOS `CacheData` approach (借鉴)
+- [FilzaSlop](https://github.com/0xjohnnydev/FilzaSlop) — ContainerManager file-access research (借鉴)
+- [bad_query](https://github.com/forcequitOS/bad_query) — Path-based ContainerManager sandbox escape (依赖)
+- [0xJohnny](https://x.com/0xjohnny) — MobileHouseArrest / ContainerManager proof of concept (借鉴)
+- [neospring](https://github.com/rooootdev/neospring) — WebKit respring implementation (基于开发)
+- [GestaltEdit](https://github.com/frs0n/GestaltEdit) — MobileGestalt tab built on this project (基于开发)
+- [FilzaJailedDS](https://github.com/34306/FilzaJailedDS) — Sandbox-escape verification and write-hardening patterns (借鉴)
 
-GestaltKitTool is an independent implementation and is not affiliated with Apple or any of the projects listed above.
+GestaltKitTool is an independent implementation and is not affiliated with Apple or any listed project.
 
 ## License
 

@@ -2,9 +2,8 @@
 //  DiagnosticsView.swift
 //  GestaltKitTool
 //
-//  Built-in diagnostics panel — tests bad_query availability, sandbox
-//  lease acquisition, container discovery, and file read operations.
-//  Inspired by Vellune's diagnostic capabilities.
+//  Diagnostics panel — tests bad_query availability, sandbox lease
+//  acquisition, container discovery, and file read operations.
 //
 
 import Combine
@@ -25,8 +24,18 @@ struct DiagnosticsView: View {
                     }
                 }
                 .disabled(model.isRunning)
+
+                Button {
+                    model.runFlagProbe()
+                } label: {
+                    HStack {
+                        Image(systemName: "flask")
+                        Text(String(localized: "Probe Flags (Find RW)"))
+                    }
+                }
+                .disabled(model.isRunning)
             } footer: {
-                Text("Tests bad_query availability, sandbox lease, container discovery, and file read operations.")
+                Text(String(localized: "Run All tests bad_query availability, sandbox lease, container discovery, and file read operations. Probe Flags enumerates flag combinations to find one that grants read-write access (diagnostic only, results in Console.app filter [GKTL-ObjC])."))
             }
 
             Section("Results") {
@@ -91,6 +100,24 @@ final class DiagnosticsModel: ObservableObject {
 
     private let fileAccess = BadQueryFileAccess.shared()
 
+    func runFlagProbe() {
+        guard !isRunning else { return }
+        isRunning = true
+        results = []
+        log = ""
+
+        let gestaltPath = "/var/containers/Shared/SystemGroup/systemgroup.com.apple.mobilegestaltcache/Library/Caches/com.apple.MobileGestalt.plist"
+
+        Task.detached(priority: .userInitiated) {
+            BadQueryProbeFlags(gestaltPath)
+
+            await MainActor.run {
+                self.log = String(localized: "Flag probe complete. Check Console.app (filter [GKTL-ObjC]) for results.\nLook for lines with canWrite=1 — that flag value grants read-write access.")
+                self.isRunning = false
+            }
+        }
+    }
+
     func runAll() {
         guard !isRunning else { return }
         isRunning = true
@@ -104,7 +131,8 @@ final class DiagnosticsModel: ObservableObject {
 
         let fileAccess = self.fileAccess
 
-        DispatchQueue.global(qos: .userInitiated).async {
+        // for cooperative cancellation and better backpressure.
+        Task.detached(priority: .userInitiated) {
             // MARK: Test 1 — bad_query Availability
             let r1: DiagnosticResult = {
                 let available = BadQueryBridgeAvailable()
@@ -139,14 +167,21 @@ final class DiagnosticsModel: ObservableObject {
                     return DiagnosticResult(
                         name: "Sandbox Lease Acquisition",
                         status: .pass,
-                        detail: "Lease acquired for file:\n\(gestaltPath)"
+                        detail: String(localized: "Lease acquired for file:\n\(gestaltPath)")
                     )
                 } else {
-                    let errMsg = leaseError as? String ?? "unknown error"
+                    let errMsg = leaseError as? String ?? String(localized: "unknown error")
+                    // Enrich the error with iOS version-specific guidance.
+                    let osVersion = ProcessInfo.processInfo.operatingSystemVersion
+                    let build = GestaltAccess.currentOSBuild()
+                    var enriched = String(localized: "Failed to acquire lease: \(errMsg)")
+                    if osVersion.majorVersion == 26 && osVersion.minorVersion == 0 {
+                        enriched += "\n\n" + String(localized: "[ iOS 26.0.x detected (build \(build)) ] bad_query's ContainerManager query was accepted but the kernel refused to issue a sandbox extension. This is a known symptom on early iOS 26.0 builds where the sandbox policy differs from iOS 27. Possible causes:\n  1. The MobileGestalt cache plist has not been generated yet — try respringing once, then rerun diagnostics.\n  2. The bad_query exploit parameters (class=13, part=3, flags=0x8000000000) may need adjustment for this specific build.\n  3. Apple may have partially patched bad_query in this build.\n\nCheck the device console (Console.app, filter [GKTL-ObjC]) for detailed per-stage logs showing exactly where the lease acquisition failed (lstat / create / getSingleResult / copySandboxToken / consume).")
+                    }
                     return DiagnosticResult(
                         name: "Sandbox Lease Acquisition",
                         status: .fail,
-                        detail: "Failed to acquire lease: \(errMsg)"
+                        detail: enriched
                     )
                 }
             }()
@@ -217,32 +252,10 @@ final class DiagnosticsModel: ObservableObject {
 
             // MARK: Test 6 — MobileGestalt Write Test (uses shared lease)
             //
-            // CR-16 v5 FIX (root cause): The previous test created a
-            // synthetic probe file (.gestaltkit_tool_writeprobe.tmp)
-            // which never existed on a fresh run → Phase 1
-            // (open with O_WRONLY|O_TRUNC, no O_CREAT) always returned
-            // ENOENT → forced Phase 2 O_CREAT → MAC policy on the
-            // MobileGestalt cache dir denied O_CREAT → EPERM → test
-            // always showed Fail. Users were confused because real
-            // saveGestalt: calls still succeeded.
-            //
-            // The real saveGestalt: implementation (see GestaltAccess.m
-            // -saveGestalt:error:) opens the REAL pre-existing plist
-            // with `open(O_WRONLY | O_CLOEXEC | O_NOFOLLOW)` — NO
-            // O_CREAT, NO O_TRUNC in open() (it ftrunctates later with
-            // a file descriptor). So we mirror that EXACTLY here:
-            //   1. Open gestaltPath with saveGestalt:'s exact flags.
-            //      If this fails, saveGestalt: WILL fail with the same
-            //      errno → report Fail.
-            //   2. If open() succeeds → the kernel + MAC + DAC have all
-            //      granted write access. We do NOT modify the file
-            //      (no write/truncate) to avoid any risk of corrupting
-            //      the identity cache; just close + report Pass.
-            //   3. (Optional non-destructive probe) We additionally run
-            //      the legacy temp-probe as a secondary informational
-            //      check so the user can see whether O_CREAT is also
-            //      allowed; its outcome never flips the final
-            //      Pass/Fail status — only the gestaltPath open() does.
+            // Mirrors saveGestalt:'s exact open() flags (O_WRONLY|O_CLOEXEC|O_NOFOLLOW):
+            //   1. Open gestaltPath — if it fails, saveGestalt: will fail too.
+            //   2. If open succeeds, close immediately (non-destructive).
+            //   3. Optional O_CREAT probe is informational-only and never flips Pass/Fail.
             let r6: DiagnosticResult = {
                 guard leaseActive else {
                     let detail = leaseError as? String ?? "unknown bad_query error"
@@ -254,7 +267,7 @@ final class DiagnosticsModel: ObservableObject {
                 }
 
                 return gestaltPath.withCString { gestaltFsRep in
-                    // ── Phase A (truth): open REAL plist like saveGestalt: does ──
+                    // MARK: - Phase A (truth): open REAL plist like saveGestalt: does
                     let gestaltFd = open(gestaltFsRep,
                                          O_WRONLY | O_CLOEXEC | O_NOFOLLOW)
                     guard gestaltFd >= 0 else {
@@ -285,12 +298,8 @@ final class DiagnosticsModel: ObservableObject {
                     let closeResult = close(gestaltFd)
                     let closeErrno = errno
 
-                    // ── Phase B (informational only): legacy temp probe ──
-                    //   Run the old O_CREAT probe purely so users can see
-                    //   whether directory-level file creation is also
-                    //   allowed. Outcome never downgrades Phase A's
-                    //   Pass. We only use this to optionally add a
-                    //   Warning-level note.
+                    // MARK: - Phase B (informational only): O_CREAT probe
+                    // Never downgrades Phase A's Pass; only adds an optional warning note.
                     let tmpFile = cacheDir + "/.gestaltkit_tool_writeprobe.tmp"
                     var probeMsg: String? = nil
                     var probeStatus: DiagnosticStatus = .pass
@@ -300,14 +309,7 @@ final class DiagnosticsModel: ObservableObject {
                                        O_WRONLY | O_CREAT | O_TRUNC | O_EXCL,
                                        0o644)
                         if pfd >= 0 {
-                            // ISSUE-3 (engineering-consistency fix):
-                            // same strict return-value checks used in
-                            // Phase A (gestaltFd close) and in
-                            // GestaltAccess.m's saveGestalt: (fsync).
-                            // Phase B is informational-only, but
-                            // fsync/write/close failures here still
-                            // hint at I/O/MAC problems useful to the
-                            // diagnosis → propagate into probeMsg.
+                            // Phase B: informational O_CREAT probe with strict return checks.
                             let sig: [UInt8] = [0x57, 0x45, 0x53, 0x4B]
                             let written: Int = sig.withUnsafeBytes { p in
                                 guard let b = p.baseAddress else { return -1 }
@@ -330,13 +332,8 @@ final class DiagnosticsModel: ObservableObject {
                             }
                         } else {
                             let err = errno
-                            // CR-22: Phase B EPERM/EACCES are EXPECTED on
-                            // iOS — the MobileGestalt cache dir has MAC
-                            // policy that denies O_CREAT. This does NOT
-                            // affect saveGestalt: (which opens the existing
-                            // plist without O_CREAT). Phase A already proved
-                            // saveGestalt: will work, so Phase B's EPERM is
-                            // purely informational → keep .pass status.
+                            // Phase B EPERM/EACCES are expected — MAC policy denies O_CREAT.
+                            // Phase A already proved saveGestalt: works, so Phase B stays .pass.
                             probeStatus = .pass
                             switch err {
                             case EPERM:
@@ -352,18 +349,15 @@ final class DiagnosticsModel: ObservableObject {
                         }
                     }
 
-                    // ── Compose final result ──
+                    // MARK: - Compose final result
                     var finalStatus: DiagnosticStatus = .pass
                     var detail = "saveGestalt: mirror probe — opened MobileGestalt.plist O_WRONLY (matches saveGestalt: open flags). saveGestalt: should succeed. \(probeMsg ?? "")"
                     if closeResult != 0 {
                         finalStatus = .warn
                         detail = "saveGestalt: mirror probe — opened MobileGestalt.plist O_WRONLY OK, but close() returned errno=\(closeErrno). Non-fatal, but indicates flushing issues. \(probeMsg ?? "")"
                     }
-                    // CR-22: Phase B (O_CREAT probe) is informational-only.
-                    // EPERM/EACCES on cache dir are EXPECTED on iOS and do
-                    // NOT affect saveGestalt: (which doesn't use O_CREAT).
+                    // Phase B (O_CREAT probe) is informational-only.
                     // Phase A success = saveGestalt: will work → .pass.
-                    // Only close() failure can downgrade to .warn here.
                     return DiagnosticResult(
                         name: "MobileGestalt Write Test",
                         status: finalStatus,
@@ -377,7 +371,7 @@ final class DiagnosticsModel: ObservableObject {
 
             Task { @MainActor [weak self] in
                 self?.results = allResults
-                self?.log = logText + "\nDiagnostics complete."
+                self?.log = logText + "\n" + String(localized: "Diagnostics complete.")
                 self?.isRunning = false
             }
         }

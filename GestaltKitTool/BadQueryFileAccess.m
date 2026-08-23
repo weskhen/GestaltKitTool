@@ -13,9 +13,10 @@
 #import <unistd.h>
 #import <os/log.h>
 
-// 统一日志宏 — Debug 用 NSLog, Release 用 os_log
-// 注意: ObjC 文件仅 1 处日志, 直接用 NSLog 保持简单
-#define GKTLLog(fmt, ...) NSLog(fmt, ##__VA_ARGS__)
+// Unified logging macro — uses os_log, matching Swift-side GKTLLog.
+// Migrated from NSLog to reduce console noise.
+#undef GKTLLog
+#define GKTLLog(fmt, ...) os_log(OS_LOG_DEFAULT, fmt, ##__VA_ARGS__)
 
 #pragma mark - Path helpers for stat-time correctness
 
@@ -28,7 +29,7 @@
 ///                                 → NSDate 1970-01-01 → UI "Jan 1"
 ///   stat("/private/var/...")  → direct real-path lookup → real mtime
 ///
-/// C-1 FIX: Return nil for nil / empty input. Previously we returned the
+/// Return nil for nil / empty input. Previously we returned the
 /// empty string untouched, which then caused `-[NSString
 /// fileSystemRepresentation]` to raise an
 ///   `NSInvalidArgumentException: Cannot form file system representation
@@ -55,7 +56,7 @@ static NSString *BQNormalizeForStat(NSString *path)
 ///      on freshly-created-but-never-touched files, and retrying with a
 ///      lease for every single file would mean 200 XPC round-trips for
 ///      a 200-file directory, blocking the UI thread for 2–3 seconds
-///      (this caused the "一直显示加载中" regression reported by user).
+///      (this caused the "stuck on loading" regression reported by user).
 ///   3. If `allowLeaseRetry` is NO, skip the lease retry entirely. Used
 ///      by the fallback opendir branch which already holds a lease.
 ///
@@ -64,7 +65,7 @@ static BOOL BQFillStatRetry(NSString *path, struct stat *outSt, BOOL followSymli
 {
     if (!path || !outSt) return NO;
     NSString *real = BQNormalizeForStat(path);
-    if (real.length == 0) return NO;  // C-1: protect against empty → FSRep crash
+    if (real.length == 0) return NO;  // protect against empty → FSRep crash
     const char *cpath = [real fileSystemRepresentation];
     if (!cpath) return NO;
 
@@ -94,6 +95,41 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
     return BQFillStatRetry(path, outSt, followSymlink, YES);
 }
 
+#pragma mark - Critical path guard
+
+// Critical-path guard for mutating operations. Refuses writes,
+// deletes, creates, and moves to /System/, /usr/, /bin/, /sbin/,
+// /private/var/db/, /private/etc/. Uses realpath() to catch symlinks.
+static NSArray<NSString *> *BQCriticalPaths(void)
+{
+    static NSArray<NSString *> *paths;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        paths = @[
+            @"/System/", @"/usr/", @"/bin/", @"/sbin/",
+            @"/private/var/db/", @"/private/etc/"
+        ];
+    });
+    return paths;
+}
+
+static BOOL BQIsCriticalSystemPath(NSString *path)
+{
+    NSArray<NSString *> *critical = BQCriticalPaths();
+    for (NSString *prefix in critical) {
+        if ([path hasPrefix:prefix]) return YES;
+    }
+    const char *pathC = path.fileSystemRepresentation;
+    char resolved[PATH_MAX];
+    if (realpath(pathC, resolved)) {
+        NSString *resolvedPath = [NSString stringWithUTF8String:resolved];
+        for (NSString *prefix in critical) {
+            if ([resolvedPath hasPrefix:prefix]) return YES;
+        }
+    }
+    return NO;
+}
+
 #pragma mark - BQFileEntry
 
 @interface BQFileEntry ()
@@ -109,7 +145,24 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
 
 #pragma mark - BadQueryFileAccess
 
+// Serial queue for all mutating operations (write, delete,
+// createDirectory, move, copyDirectory, deleteDirectoryContents).
+@interface BadQueryFileAccess ()
+{
+    dispatch_queue_t _mutationQueue;
+}
+@end
+
 @implementation BadQueryFileAccess
+
+- (instancetype)init
+{
+    self = [super init];
+    if (self) {
+        _mutationQueue = dispatch_queue_create("com.wesk.badquery.mutation", DISPATCH_QUEUE_SERIAL);
+    }
+    return self;
+}
 
 + (instancetype)shared
 {
@@ -118,7 +171,6 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
     dispatch_once(&onceToken, ^{ shared = [BadQueryFileAccess new]; });
     return shared;
 }
-
 - (nullable NSData *)readFileAtPath:(NSString *)path error:(NSError **)error
 {
     if (!path.isAbsolutePath) {
@@ -127,9 +179,9 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
         return nil;
     }
 
-    // CR-13: MEMORY CAP. Cap the read at 16 MB; larger files return only
+    // MEMORY CAP. Cap the read at 16 MB; larger files return only
     // their first 16 MB so the preview stays cheap. Used by both the
-    // lease-based read and the CR-28 direct-read fallback.
+    // lease-based read and the direct-read fallback.
     static const long long kMaxReadBytes = 16LL * 1024 * 1024;
 
     // Acquire a bad_query lease for the target path.
@@ -137,7 +189,7 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
     BadQueryLease *lease = [BadQueryLease leaseForPath:path
                                                  error:&badQueryDetail];
     if (!lease) {
-        // CR-28: Lease failed — but opendir (listDirectory) works WITHOUT
+        // Lease failed — but opendir (listDirectory) works WITHOUT
         // a lease for many paths (e.g. /var/mobile/Library/). Try direct
         // open() the same way opendir works. If the MAC policy allows
         // directory listing, it may also allow file reading.
@@ -159,15 +211,13 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
 
     // The lease grants sandbox access, but we still read via NSFileManager
     // since the sandbox extension applies to the process.
-    // H-2: Use NSDataReadingMappedIfSafe is dangerous here — the mmap'd
+    // Use NSDataReadingMappedIfSafe is dangerous here — the mmap'd
     // data remains backed by the file even after [lease invalidate],
     // causing SIGBUS when accessed. Instead, read into an allocated
     // buffer that's fully independent of the file mapping.
     //
-    // CR-13: MEMORY CAP. The old code read the ENTIRE file into memory.
-    // Tapping a large file (ATX .db stores, videos, .sqlite-wal) pulled
-    // tens or hundreds of MB into the process → jetsam kill. (kMaxReadBytes
-    // is defined above with the CR-28 direct-read fallback.)
+    // MEMORY CAP: kMaxReadBytes limits direct reads to avoid jetsam kills
+    // on large files (ATX .db stores, videos, .sqlite-wal).
 
     long long fileSize = 0;
     struct stat st;
@@ -221,44 +271,10 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
     }
 
     // =====================================================================
-    // STRATEGY (revised after studying FilzaJailedDS / FilzaSlop):
-    //
-    // Filza* variants use KRW to patch the kernel ucred sandbox extension
-    // table to "/" — then standard opendir/readdir with struct dirent
-    // d_type works EVERYWHERE. That's the gold standard: d_type is 100%
-    // reliable, no heuristics, no dupe snapshot inodes, no gap limits.
-    //
-    // Since we use bad_query (per-path sandbox extensions rather than
-    // kernel memory patching), we can't always count on that, but we
-    // STILL prefer opendir paths in this priority order:
-    //
-    //   1. opendir WITHOUT any lease — works for:
-    //        - Our own app container sandbox (always listable)
-    //        - World-readable system directories (/tmp, /Library on
-    //          certain paths, etc.)
-    //        - Any container path whose MAC policy allows directory
-    //          listing for the app-sandbox class even without an
-    //          explicit extension.
-    //      THIS IS THE FASTEST AND MOST RELIABLE PATH. d_type from
-    //      dirent is authoritative (DT_DIR / DT_REG / DT_LNK / ...),
-    //      no heuristics needed. Zero XPC. ~ms for even 10k-file dirs.
-    //
-    //   2. opendir AFTER acquiring a single bad_query lease for the
-    //      PARENT directory. Frequently works on iOS 27+ too. Same
-    //      d_type reliability as #1; just one XPC call.
-    //
-    //   3. fsgetpath inode-scan fallback — ONLY if opendir fails in
-    //      both #1 and #2. This is the "least reliable" path (snapshot
-    //      aliases → duplicates, heuristic isDirectory guesses, and we
-    //      have to gap-stop early), so we prefer avoiding it whenever
-    //      opendir is viable. The inode cap is relaxed from the old
-    //      200K to 350K here because we only reach it when opendir
-    //      couldn't help at all, so a slightly deeper scan is worth
-    //      the trade-off.
-    //
-    // This is the INVERSE of the old code (fsgetpath first, opendir as
-    // empty-array-only fallback). The inversion eliminates 90% of the
-    // "strange" browsing artifacts users have been seeing.
+    // Strategy: try opendir in priority order:
+    //   1. opendir without lease (fastest, works for own container + world-readable dirs).
+    //   2. opendir after acquiring a bad_query lease for the parent directory.
+    //   3. fsgetpath inode-scan fallback (last resort, cap 350K inodes).
     // =====================================================================
 
     NSString *realDir = BQNormalizeForStat(path);
@@ -277,7 +293,7 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
     NSMutableArray<BQFileEntry *> *(^collectFromDir)(DIR *) =
         ^NSMutableArray<BQFileEntry *> *(DIR *dir) {
         NSMutableArray<BQFileEntry *> *entries = [NSMutableArray array];
-        // CR-25: Track seen d_name to prevent duplicates from readdir.
+        // Track seen d_name to prevent duplicates from readdir.
         // On APFS with snapshots/clones, readdir can occasionally return
         // the same d_name twice (especially under MAC policy). This
         // NSMutableSet ensures each name appears only once.
@@ -287,7 +303,7 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
             const char *d_name = de->d_name;
             if (strcmp(d_name, ".") == 0 || strcmp(d_name, "..") == 0) continue;
 
-            // CR-11 + CR-13: d_name might not be valid UTF-8 on APFS
+            // + d_name might not be valid UTF-8 on APFS
             // snapshots / FUSE mounts. Fall back to Latin-1 which
             // can never return nil (maps all 256 byte values 1:1).
             NSString *nameStr = [NSString stringWithUTF8String:d_name];
@@ -300,9 +316,9 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
             }
             if (nameStr.length == 0) continue;
 
-            // CR-25: Skip duplicates (same d_name returned twice by readdir).
+            // Skip duplicates (same d_name returned twice by readdir).
             if ([seenNames containsObject:nameStr]) {
-                GKTLLog(@"[GKTL-ObjC] ⚠️ DUPLICATE-d_name skipped: %@", nameStr);
+                os_log(OS_LOG_DEFAULT, "[GKTL-ObjC] DUPLICATE-d_name skipped: %{public}@", nameStr);
                 continue;
             }
             [seenNames addObject:nameStr];
@@ -327,14 +343,14 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
             // the directory opened without a lease, most child paths
             // inside a listed directory respond to direct lstat.
             //
-            // CR-17 (mtime=0 fix): On iOS 26 with MAC policy, lstat
+            // (mtime=0 fix): On iOS 26 with MAC policy, lstat
             // succeeds but st_mtime is frequently 0 (epoch 1970) for
             // sandboxed paths under /private/var/mobile/... and
             // /private/var/containers/... — the kernel returns the
             // inode metadata but MAC scrubs the timestamps. Showing
             // "1970-01-01 08:00" to the user is worse than showing
             // nothing, so treat mtime==0 as "no date available".
-            // Predecessor weskVTool used stat() (follows symlinks)
+            // stat() follows symlinks
             // which failed outright under MAC → modificationDate
             // stayed nil → no misleading date shown.
             struct stat st;
@@ -342,7 +358,7 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
             if (ep && lstat(ep, &st) == 0) {
                 entry.isDirectory = S_ISDIR(st.st_mode); // override d_type for symlink→dir if we followed
                 entry.fileSize = (long long)st.st_size;
-                // CR-17: Only set modificationDate if mtime is a real
+                // Only set modificationDate if mtime is a real
                 // Unix timestamp (> 0). mtime=0 almost always means MAC
                 // scrubbing, not a real "Jan 1 1970" file.
                 if (st.st_mtime > 0) {
@@ -426,14 +442,14 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
 
     NSMutableArray<BQFileEntry *> *entries = [NSMutableArray array];
     NSMutableArray<BQFileEntry *> *entriesNeedingLease = [NSMutableArray array];
-    // CR-25: dedupe by normalized childPath (fsgetpath can return
+    // dedupe by normalized childPath (fsgetpath can return
     // /var/X and /private/var/X for the same inode).
     NSMutableSet<NSString *> *seenPaths = [NSMutableSet set];
 
     for (NSString *childPath in childPaths) {
         if (childPath.length == 0) continue;
 
-        // CR-25: normalize for dedup (strip /private, lowercase).
+        // normalize for dedup (strip /private, lowercase).
         NSString *normPath = [childPath stringByStandardizingPath];
         if ([normPath hasPrefix:@"/private/"]) {
             normPath = [normPath substringFromIndex:@"/private".length];
@@ -463,7 +479,7 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
         if (lstat(cpath, &st) == 0) {
             entry.isDirectory = S_ISDIR(st.st_mode);
             entry.fileSize = (long long)st.st_size;
-            // CR-17: mtime=0 means MAC scrubbing, not a real epoch date.
+            // mtime=0 means MAC scrubbing, not a real epoch date.
             entry.modificationDate = (st.st_mtime > 0)
                 ? [NSDate dateWithTimeIntervalSince1970:st.st_mtime]
                 : nil;
@@ -493,7 +509,7 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
                 if (entryC && lstat(entryC, &st2) == 0) {
                     entry.isDirectory = S_ISDIR(st2.st_mode);
                     entry.fileSize = (long long)st2.st_size;
-                    // CR-17: same mtime=0 guard as the main stat path.
+                    // same mtime=0 guard as the main stat path.
                     entry.modificationDate = (st2.st_mtime > 0)
                         ? [NSDate dateWithTimeIntervalSince1970:st2.st_mtime]
                         : nil;
@@ -550,7 +566,14 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
                 if (looksLikeUUID) {
                     entry.isDirectory = YES;
                 } else if (ext.length == 0) {
-                    entry.isDirectory = YES;
+                    // No extension and not a UUID — could be either.
+                    // Default to file: if it is actually a directory,
+                    // handleEntryTap's browse-first fallback will
+                    // navigate into it on the next tap. Classifying a
+                    // file as a directory causes a confusing empty-list
+                    // flash; classifying a directory as a file costs one
+                    // extra tap but is clearly recoverable.
+                    entry.isDirectory = NO;
                 } else {
                     NSSet<NSString *> *commonFileExts = [NSSet setWithArray:@[
                         @"plist", @"sqlite", @"db", @"sqlitedb",
@@ -615,7 +638,7 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
         return @[];
     }
 
-    // H-3: Track visited directories to detect symlink loops.
+    // Track visited directories to detect symlink loops.
     // Use canonicalized paths (resolved symlinks) for the visited set.
     NSMutableSet<NSString *> *visited = [NSMutableSet set];
     NSMutableArray<BQFileEntry *> *allEntries = [NSMutableArray array];
@@ -637,27 +660,23 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
                     into:(NSMutableArray<BQFileEntry *> *)collector
 {
     if (maxDepth >= 0 && depth > maxDepth) return;
-    if (path.length == 0) return;   // C-1: empty path → realpath of "" is UB
+    if (path.length == 0) return;   // empty path → realpath of "" is UB
 
-    // CR-13: hard cap on collected entries. A deep recursion into a
-    // huge tree (e.g. a container with hundreds of thousands of files)
-    // previously accumulated every entry (each with 2 NSStrings + NSDate)
-    // until memory exploded. Stop collecting at 50k — plenty for any
-    // practical search result list.
+    // Hard cap on collected entries to prevent memory growth in deep trees.
     static const NSUInteger kMaxCollectedEntries = 50000;
     if (collector.count >= kMaxCollectedEntries) return;
 
-    // H-3: Resolve symlinks to detect loops. If realpath fails, skip.
+    // Resolve symlinks to detect loops. If realpath fails, skip.
     const char *pathC = [path fileSystemRepresentation];
     if (!pathC) return;
     char resolved[PATH_MAX];
     if (!realpath(pathC, resolved)) return;
 
-    // CR-11-AUDIT: realpath returns a valid C string but APFS allows
+    // -AUDIT: realpath returns a valid C string but APFS allows
     // arbitrary bytes in path components (not valid UTF-8 on old
     // volumes). If NSString conversion fails we can't track visited
     // — bail to avoid crashing addObject:nil / setObject:nil.
-    // CR-13: Latin-1 fallback (ASCII rejects bytes >= 0x80 and can
+    // Latin-1 fallback (ASCII rejects bytes >= 0x80 and can
     // still return nil; Latin-1 maps all 256 bytes and never fails).
     NSString *resolvedPath = [NSString stringWithUTF8String:resolved];
     if (!resolvedPath) {
@@ -687,6 +706,327 @@ static BOOL BQFillStat(NSString *path, struct stat *outSt, BOOL followSymlink)
                             into:collector];
         }
     }
+}
+
+#pragma mark - Write / Copy / Delete / Create / Move ()
+
+- (BOOL)writeFileAtPath:(NSString *)path data:(NSData *)data error:(NSError **)error
+{
+    if (!path.isAbsolutePath) {
+        if (error) *error = [self errorWithCode:1
+                                         message:@"An absolute path is required."];
+        return NO;
+    }
+
+    if (BQIsCriticalSystemPath(path)) {
+        if (error) *error = [self errorWithCode:8
+            message:[NSString stringWithFormat:
+                @"Refusing to write to critical system path: %@", path]];
+        return NO;
+    }
+
+    __block BOOL result = NO;
+    __block NSError *blockError = nil;
+    dispatch_sync(_mutationQueue, ^{
+        NSString *badQueryDetail = nil;
+        BadQueryLease *lease = [BadQueryLease leaseForPath:path
+                                                     error:&badQueryDetail];
+        if (!lease) {
+            blockError = [self errorWithCode:2
+                                      message:badQueryDetail ?: @"bad_query failed to acquire write access."];
+            return;
+        }
+
+        NSError *writeError = nil;
+        result = [data writeToFile:path options:NSDataWritingAtomic error:&writeError];
+
+        if (!result) {
+            writeError = nil;
+            result = [data writeToFile:path options:0 error:&writeError];
+        }
+
+        [lease invalidate];
+
+        if (!result) {
+            blockError = writeError ?: [self errorWithCode:6
+                                                  message:@"Write denied — sandbox extension may be read-only for this path."];
+        }
+    });
+    if (error) *error = blockError;
+    return result;
+}
+
+- (NSInteger)copyDirectoryFromPath:(NSString *)sourcePath
+                     toDestination:(NSString *)destinationPath
+                              error:(NSError **)error
+{
+    if (!sourcePath.isAbsolutePath || !destinationPath.isAbsolutePath) {
+        if (error) *error = [self errorWithCode:1
+                                         message:@"Absolute paths are required."];
+        return -1;
+    }
+
+    NSString *normalizedSource = sourcePath;
+    if (![normalizedSource hasSuffix:@"/"]) {
+        normalizedSource = [normalizedSource stringByAppendingString:@"/"];
+    }
+
+    NSError *listError = nil;
+    NSArray<BQFileEntry *> *entries = [self recursiveListAtPath:sourcePath
+                                                       maxDepth:10
+                                                          error:&listError];
+    if (listError) {
+        if (error) *error = listError;
+        return -1;
+    }
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSInteger copied = 0;
+
+    [fm createDirectoryAtPath:destinationPath
+   withIntermediateDirectories:YES
+                   attributes:nil
+                        error:nil];
+
+    for (BQFileEntry *entry in entries) {
+        NSString *relative = nil;
+        if ([entry.fullPath hasPrefix:normalizedSource]) {
+            relative = [entry.fullPath substringFromIndex:normalizedSource.length];
+        } else if ([entry.fullPath isEqualToString:sourcePath]) {
+            continue;
+        } else {
+            continue;
+        }
+        if (relative.length == 0) continue;
+
+        NSString *destPath = [destinationPath stringByAppendingPathComponent:relative];
+
+        if (entry.isDirectory) {
+            [fm createDirectoryAtPath:destPath
+          withIntermediateDirectories:YES
+                         attributes:nil
+                              error:nil];
+            continue;
+        }
+
+        NSError *readErr = nil;
+        NSData *data = [self readFileAtPath:entry.fullPath error:&readErr];
+        if (!data) continue;
+
+        NSError *writeErr = nil;
+        NSString *parentDir = [destPath stringByDeletingLastPathComponent];
+        [fm createDirectoryAtPath:parentDir
+      withIntermediateDirectories:YES
+                     attributes:nil
+                          error:nil];
+        if ([data writeToFile:destPath options:0 error:&writeErr]) {
+            copied++;
+        }
+    }
+
+    if (error) *error = nil;
+    return copied;
+}
+
+- (BOOL)deleteFileAtPath:(NSString *)path error:(NSError **)error
+{
+    if (!path.isAbsolutePath) {
+        if (error) *error = [self errorWithCode:1
+                                         message:@"An absolute path is required."];
+        return NO;
+    }
+
+    if (BQIsCriticalSystemPath(path)) {
+        if (error) *error = [self errorWithCode:8
+            message:[NSString stringWithFormat:
+                @"Refusing to delete critical system path: %@", path]];
+        return NO;
+    }
+
+    __block BOOL result = NO;
+    __block NSError *blockError = nil;
+    dispatch_sync(_mutationQueue, ^{
+        NSString *badQueryDetail = nil;
+        BadQueryLease *lease = [BadQueryLease leaseForPath:path
+                                                     error:&badQueryDetail];
+        if (!lease) {
+            blockError = [self errorWithCode:2
+                                      message:badQueryDetail ?: @"bad_query failed to acquire delete access."];
+            return;
+        }
+
+        NSError *deleteError = nil;
+        result = [[NSFileManager defaultManager] removeItemAtPath:path
+                                                            error:&deleteError];
+        [lease invalidate];
+
+        if (!result) {
+            blockError = deleteError ?: [self errorWithCode:9
+                                                  message:@"Delete denied — sandbox extension may be read-only."];
+        }
+    });
+    if (error) *error = blockError;
+    return result;
+}
+
+- (NSInteger)deleteDirectoryContentsAtPath:(NSString *)path
+                                  maxItems:(NSInteger)maxItems
+                                     error:(NSError **)error
+{
+    if (!path.isAbsolutePath) {
+        if (error) *error = [self errorWithCode:1
+                                         message:@"An absolute path is required."];
+        return -1;
+    }
+
+    __block NSInteger result = 0;
+    __block NSError *blockError = nil;
+    dispatch_sync(_mutationQueue, ^{
+        NSError *listError = nil;
+        NSArray<BQFileEntry *> *entries = [self listDirectoryAtPath:path
+                                                               error:&listError];
+        if (listError) {
+            blockError = listError;
+            result = -1;
+            return;
+        }
+
+        NSInteger deleted = 0;
+        for (BQFileEntry *entry in entries) {
+            if (maxItems > 0 && deleted >= maxItems) break;
+
+            if (entry.isDirectory) {
+                NSError *subError = nil;
+                NSInteger subDeleted = [self deleteDirectoryContentsAtPath:entry.fullPath
+                                                                  maxItems:(maxItems > 0 ? maxItems - deleted : 0)
+                                                                     error:&subError];
+                deleted += subDeleted;
+
+                NSString *badQueryDetail = nil;
+                BadQueryLease *lease = [BadQueryLease leaseForPath:entry.fullPath
+                                                             error:&badQueryDetail];
+                if (lease) {
+                    [[NSFileManager defaultManager] removeItemAtPath:entry.fullPath
+                                                               error:nil];
+                    [lease invalidate];
+                    deleted++;
+                }
+            } else {
+                NSError *delError = nil;
+                if ([self deleteFileAtPath:entry.fullPath error:&delError]) {
+                    deleted++;
+                }
+            }
+        }
+        result = deleted;
+    });
+    if (result < 0) {
+        if (error) *error = blockError;
+        return -1;
+    }
+    if (error) *error = nil;
+    return result;
+}
+
+- (BOOL)createDirectoryAtPath:(NSString *)path error:(NSError **)error
+{
+    if (!path.isAbsolutePath) {
+        if (error) *error = [self errorWithCode:1
+                                         message:@"An absolute path is required."];
+        return NO;
+    }
+
+    if (BQIsCriticalSystemPath(path)) {
+        if (error) *error = [self errorWithCode:8
+            message:@"Refusing to create directory in critical system path."];
+        return NO;
+    }
+
+    __block BOOL result = NO;
+    __block NSError *blockError = nil;
+    dispatch_sync(_mutationQueue, ^{
+        NSString *badQueryDetail = nil;
+        BadQueryLease *lease = [BadQueryLease leaseForPath:path
+                                                     error:&badQueryDetail];
+        if (!lease) {
+            blockError = [self errorWithCode:2
+                                      message:badQueryDetail ?: @"bad_query failed to acquire access for directory creation."];
+            return;
+        }
+
+        NSError *createError = nil;
+        result = [[NSFileManager defaultManager] createDirectoryAtPath:path
+                                                  withIntermediateDirectories:YES
+                                                                  attributes:nil
+                                                                       error:&createError];
+        [lease invalidate];
+
+        if (!result) {
+            blockError = createError ?: [self errorWithCode:10
+                                                  message:@"Failed to create directory."];
+        }
+    });
+    if (error) *error = blockError;
+    return result;
+}
+
+- (BOOL)moveFileFromPath:(NSString *)sourcePath
+                   toPath:(NSString *)destinationPath
+                    error:(NSError **)error
+{
+    if (!sourcePath.isAbsolutePath || !destinationPath.isAbsolutePath) {
+        if (error) *error = [self errorWithCode:1
+                                         message:@"Absolute paths are required."];
+        return NO;
+    }
+
+    if (BQIsCriticalSystemPath(sourcePath) || BQIsCriticalSystemPath(destinationPath)) {
+        if (error) *error = [self errorWithCode:8
+            message:@"Refusing to move to/from critical system path."];
+        return NO;
+    }
+
+    __block BOOL result = NO;
+    __block NSError *blockError = nil;
+    dispatch_sync(_mutationQueue, ^{
+        NSString *badQueryDetail = nil;
+        BadQueryLease *lease = [BadQueryLease leaseForPath:sourcePath
+                                                     error:&badQueryDetail];
+        if (!lease) {
+            blockError = [self errorWithCode:2
+                                      message:badQueryDetail ?: @"bad_query failed to acquire move access."];
+            return;
+        }
+
+        NSString *destParent = [destinationPath stringByDeletingLastPathComponent];
+        [[NSFileManager defaultManager] createDirectoryAtPath:destParent
+                                  withIntermediateDirectories:YES
+                                                  attributes:nil
+                                                       error:nil];
+
+        NSError *moveError = nil;
+        result = [[NSFileManager defaultManager] moveItemAtPath:sourcePath
+                                                           toPath:destinationPath
+                                                            error:&moveError];
+        [lease invalidate];
+
+        if (!result) {
+            NSError *readErr = nil;
+            NSData *data = [self readFileAtPath:sourcePath error:&readErr];
+            if (data) {
+                NSError *writeErr = nil;
+                if ([self writeFileAtPath:destinationPath data:data error:&writeErr]) {
+                    [self deleteFileAtPath:sourcePath error:nil];
+                    result = YES;
+                    return;
+                }
+            }
+            blockError = moveError ?: [self errorWithCode:11
+                                              message:@"Move failed."];
+        }
+    });
+    if (error) *error = blockError;
+    return result;
 }
 
 - (NSError *)errorWithCode:(NSInteger)code message:(NSString *)message

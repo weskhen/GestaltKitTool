@@ -33,13 +33,37 @@ static NSError *GestaltError(NSInteger code, NSString *message)
 
 static BOOL GestaltCanOpenReadWrite(NSString *path)
 {
-    if (path.length == 0) return NO;     // C-1: guard empty → FSRep crash
+    if (path.length == 0) return NO;     // guard empty → FSRep crash
     const char *pathC = [path fileSystemRepresentation];
     if (!pathC) return NO;
     int fd = open(pathC,
                   O_RDWR | O_CLOEXEC | O_NOFOLLOW);
-    if (fd < 0) return NO;
+    if (fd < 0) {
+        int err = errno;
+        NSLog(@"[GKTL-ObjC] GestaltCanOpenReadWrite FAILED for %@ (errno=%d: %s)",
+              path, err, strerror(err));
+        return NO;
+    }
     close(fd);
+    return YES;
+}
+
+/// Returns YES if the file can be opened read-only. Used as a fallback
+/// when O_RDWR fails (group-sacrifice flags may only grant read access).
+static BOOL GestaltCanOpenReadOnly(NSString *path)
+{
+    if (path.length == 0) return NO;
+    const char *pathC = [path fileSystemRepresentation];
+    if (!pathC) return NO;
+    int fd = open(pathC, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) {
+        int err = errno;
+        NSLog(@"[GKTL-ObjC] GestaltCanOpenReadOnly FAILED for %@ (errno=%d: %s)",
+              path, err, strerror(err));
+        return NO;
+    }
+    close(fd);
+    NSLog(@"[GKTL-ObjC] GestaltCanOpenReadOnly OK for %@", path);
     return YES;
 }
 
@@ -56,7 +80,7 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
 {
     const uint8_t *bytes = data.bytes;
     NSUInteger remaining = data.length;
-    // C-7: Cap EINTR retries to prevent infinite loop under signal pressure.
+    // Cap EINTR retries to prevent infinite loop under signal pressure.
     int eintrRetryCount = 0;
     static const int kMaxEintrRetries = 100;
     while (remaining > 0) {
@@ -74,6 +98,11 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
 
 @interface GestaltAccess ()
 @property (nonatomic, assign) BOOL isConnected;
+/// True when the sandbox extension only grants read access (not read-write).
+/// Set when GestaltCanOpenReadWrite fails but GestaltCanOpenReadOnly succeeds.
+/// saveGestalt: checks this to give an immediate, clear error instead of
+/// failing at the O_WRONLY open() with a cryptic errno.
+@property (nonatomic, assign) BOOL isReadOnlyMode;
 @property (nonatomic, copy) NSString *plistPath;
 @property (nonatomic, assign) NSPropertyListFormat lastReadFormat;
 @end
@@ -81,7 +110,7 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
 @implementation GestaltAccess
 {
     BadQueryLease *_activeBadQueryLease;
-    // H-4/H-5: Serial queue to protect connection state from concurrent access.
+    // /Serial queue to protect connection state from concurrent access.
     dispatch_queue_t _stateQueue;
 }
 
@@ -169,15 +198,15 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
     NSOperatingSystemVersion version = NSProcessInfo.processInfo.operatingSystemVersion;
     NSString *build = self.currentOSBuild;
 
-    // bad_query 原作者声明支持 iOS 26.0 - 26.6.1 / 27.0b4。
-    // 注意:iOS 26 支持基于作者声明,未在所有版本上充分测试。
-    // 建议用户反馈实际兼容性,如未来 Apple 修复 bad_query 会及时调整。
+    // bad_query author declares support for iOS 26.0 - 26.6.1 / 27.0b4.
+    // Note: iOS 26 support is per author's claim, not fully tested on all builds.
+    // User feedback on actual compatibility is welcome; will adjust if Apple patches bad_query.
     if (version.majorVersion == 26) {
         if (version.minorVersion > 6) return NO;
         if (version.minorVersion == 6 && version.patchVersion > 1) return NO;
         return YES;
     }
-    // iOS 27 仍在 beta 阶段,保留精确 build 白名单以避免未测试版本意外运行。
+    // iOS 27 is still in beta; keep precise build whitelist to avoid untested versions.
     if (version.majorVersion == 27) {
         return [build isEqualToString:@"24A5355q"] || // iOS 27 beta 1
                [build isEqualToString:@"24A5370h"] || // iOS 27 beta 2
@@ -191,7 +220,7 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
 
 - (BOOL)connectWithError:(NSError **)error
 {
-    // CR-9: Move the blocking lease acquisition + plist open to a
+    // Move the blocking lease acquisition + plist open to a
     // dedicated background queue so callers on the main thread
     // (SwiftUI button actions, @MainActor methods) don't freeze
     // the UI during XPC calls. We use a semaphore to keep the
@@ -266,6 +295,7 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
         [_activeBadQueryLease invalidate];
         _activeBadQueryLease = nil;
         self.isConnected = NO;
+        self.isReadOnlyMode = NO;
         self.plistPath = nil;
     });
 
@@ -287,15 +317,33 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
         return NO;
     }
     if (!GestaltCanOpenReadWrite(badQueryPlist)) {
+        // O_RDWR failed. On iOS 26.0.x the group-sacrifice flags
+        // (0x0800000000) that successfully acquire a lease may only
+        // grant READ access, not READ+WRITE. Fall back to read-only
+        // so the user can at least view the plist; write operations
+        // (saveGestalt:) will fail later with a clear EACCES/EINVAL.
+        if (GestaltCanOpenReadOnly(badQueryPlist)) {
+            NSLog(@"[GKTL-ObjC] GestaltAccess: read-write open failed but read-only succeeded — connecting in read-only mode");
+            dispatch_sync(_stateQueue, ^{
+                _activeBadQueryLease = badQueryLease;
+                self.isConnected = YES;
+                self.isReadOnlyMode = YES;
+                self.plistPath = badQueryPlist;
+            });
+            if (error) *error = nil;
+            return YES;
+        }
         [badQueryLease invalidate];
         if (error) *error = GestaltError(3, NSLocalizedString(
-            @"bad_query acquired a sandbox extension, but the MobileGestalt plist is not writable.", nil));
+            @"bad_query acquired a sandbox extension, but the MobileGestalt plist is neither readable nor writable.", nil));
         return NO;
     }
 
+    // O_RDWR succeeded — full read-write mode.
     dispatch_sync(_stateQueue, ^{
         _activeBadQueryLease = badQueryLease;
         self.isConnected = YES;
+        self.isReadOnlyMode = NO;
         self.plistPath = badQueryPlist;
     });
 
@@ -355,6 +403,25 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
 - (BOOL)saveGestalt:(NSDictionary *)plist error:(NSError **)error
 {
     if (![self connectWithError:error]) return NO;
+
+    // Read-only mode check: on iOS 26.0.x the group-sacrifice flags
+    // (0x0800000000) may only grant read access. Fail early with a
+    // clear message instead of letting open(O_WRONLY) fail cryptically.
+    {
+        __block BOOL readOnly = NO;
+        dispatch_sync(_stateQueue, ^{
+            readOnly = self.isReadOnlyMode;
+        });
+        if (readOnly) {
+            if (error) *error = GestaltError(16, NSLocalizedString(
+                @"The sandbox extension acquired by bad_query only grants READ access on this iOS build. "
+                "MobileGestalt values can be viewed but cannot be modified. "
+                "This is a known limitation of iOS 26.0.x where the group-sacrifice flags "
+                "(0x0800000000) do not convey write permissions.", nil));
+            return NO;
+        }
+    }
+
     if (![plist isKindOfClass:NSDictionary.class]) {
         if (error) *error = GestaltError(6, NSLocalizedString(@"The content to save is not a dictionary.", nil));
         return NO;
@@ -422,7 +489,7 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
         return NO;
     }
 
-    // H-1 fix: do NOT ftruncate(fd, 0) before writing. If we truncated
+    // fix: do NOT ftruncate(fd, 0) before writing. If we truncated
     // first and the write was interrupted by a signal / exit /
     // jetsam, the plist would be 0 bytes on disk — SpringBoard cannot
     // parse an empty plist and the device enters an endless respring
@@ -436,7 +503,7 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
     int writeErrno = errno;
 
     if (!writeOK) {
-        // CR-1 fix: GestaltWriteAll returned NO partway through. The fd
+        // fix: GestaltWriteAll returned NO partway through. The fd
         // file pointer has advanced by some N bytes (< dataLen), so the
         // on-disk file is now "first N bytes of new data + remaining
         // bytes of the original plist" — a hybrid state that binary
@@ -458,7 +525,7 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
             if (fstat(fd, &st) == 0 && st.st_size > origSize) {
                 (void)ftruncate(fd, origSize);
             }
-            // CR-2: Recovery write must ALSO be flushed to stable
+            // Recovery write must ALSO be flushed to stable
             // storage. Without this fsync there's still a window
             // (seconds) where a jetsam/reboot leaves the corrupted
             // hybrid on disk even though pwrite succeeded.
@@ -492,15 +559,13 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
     BOOL synced = fsync(fd) == 0;
     int syncErrno = errno;
     if (!synced) {
-        // MR-1: write succeeded (data is in page cache) but fsync failed.
+        // write succeeded (data is in page cache) but fsync failed.
         // The new data IS visible to subsequent reads — returning NO
         // would mislead callers into thinking nothing changed. Return
         // YES but surface a warning so the user knows persistence is
         // not guaranteed across reboot.
-        // OPT-B: Even on fsync-fail path, push out other vnode buffers
-        // (APFS transaction log, directory entries) to minimise the
-        // window of inconsistency. Borrowed from the `sync();sync();sync()`
-        // pattern used by FilzaJailedDS apfs_own after kwrite.
+        // Push out other vnode buffers (APFS transaction log, directory
+        // entries) to minimise the window of inconsistency.
         sync(); sync(); sync();
         close(fd);
         if (error) *error = GestaltError(14,
@@ -511,13 +576,11 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
         return YES;
     }
 
-    // OPT-B: fsync(fd) flushed only the file's data blocks to the
+    // fsync(fd) flushed only the file's data blocks to the
     // drive. To survive unclean shutdowns we also need the APFS
     // transaction log, the containing directory's modification record,
     // and the volume superblock checkpoint committed. Three consecutive
-    // sync() calls are a long-standing Darwin idiom that gives syncd
-    // enough wakeups to cover these. Matching FilzaJailedDS's post-
-    // kwrite defensive pattern.
+    // sync() calls are a long-standing Darwin idiom for this.
     sync(); sync(); sync();
 
     // Both write and fsync succeeded. If the new data is smaller than
@@ -539,7 +602,7 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
         }
     }
 
-    // H-7: Verify the write succeeded before closing the fd.
+    // Verify the write succeeded before closing the fd.
     // Re-read from the fd to confirm data matches.
     lseek(fd, 0, SEEK_SET);
     {
@@ -555,7 +618,7 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
             if (n <= 0) break;
             totalRead += (NSUInteger)n;
         }
-        // CR-4: When the read loop exits early (EOF/short read), the
+        // When the read loop exits early (EOF/short read), the
         // remaining portion of verifyBuf is zero-filled by calloc, but
         // we must NOT compare the full dataLen bytes (that would
         // compare zeroes against real plist bytes and always fail).
@@ -578,15 +641,14 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
         return NO;
     }
 
-    // OPT-B: Third (parse-level) verification. The two checks above
+    // Third (parse-level) verification. The two checks above
     // confirm the bytes we intended to write are on disk byte-equal to
     // `data`. However an in-memory corruption (e.g. a stray write to
     // the NSMutableData backing store during the save call) could
     // leave us with syntactically valid bytes that no longer parse as
     // a dictionary, or whose top-level key population has regressed
-    // from the original. Mirroring FilzaJailedDS apfs_own's
-    // "layout-sanity-check-before-write" pattern, we re-parse the
-    // freshly written plist and compare the top-level key coverage
+    // from the original. We re-parse the freshly written plist and
+    // compare the top-level key coverage
     // (≥80% of original top-level keys, plus the dict type matches).
     // This is the final gate before we return YES and schedule a
     // SpringBoard respring — if it fails we bail out and tell the

@@ -14,64 +14,62 @@ struct SystemInspectorView: View {
     @StateObject private var model = SystemInspectorModel()
 
     var body: some View {
-        NavigationStack {
-            List {
-                // Warning banner
+        List {
+            // Warning banner
+            Section {
+                Label {
+                    Text(String(localized: "These files contain sensitive system data. Reading them demonstrates the full impact of bad_query sandbox escape."))
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            // Target categories
+            ForEach(SystemInspectorModel.groupedTargets, id: \.category) { group in
                 Section {
-                    Label {
-                        Text("These files contain sensitive system data. Reading them demonstrates the full impact of bad_query sandbox escape.")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    } icon: {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                    ForEach(group.targets) { target in
+                        SystemFileRow(
+                            target: target,
+                            isLoading: model.loadingTargetId == target.id,
+                            result: model.results.first { $0.target.id == target.id },
+                            onTap: { model.readTarget(target) }
+                        )
                     }
+                } header: {
+                    Label(group.category.localizedTitle, systemImage: group.category.icon)
                 }
+            }
 
-                // Target categories
-                ForEach(SystemInspectorModel.groupedTargets, id: \.category) { group in
-                    Section {
-                        ForEach(group.targets) { target in
-                            SystemFileRow(
-                                target: target,
-                                isLoading: model.loadingTargetId == target.id,
-                                result: model.results.first { $0.target.id == target.id },
-                                onTap: { model.readTarget(target) }
-                            )
-                        }
-                    } header: {
-                        Label(group.category.localizedTitle, systemImage: group.category.icon)
+            // Results section
+            if !model.results.isEmpty {
+                Section {
+                    ForEach(model.results) { result in
+                        SystemFileResultRow(result: result)
                     }
-                }
-
-                // Results section
-                if !model.results.isEmpty {
-                    Section {
-                        ForEach(model.results) { result in
-                            SystemFileResultRow(result: result)
+                } header: {
+                    HStack {
+                        Text(String(localized: "Results"))
+                        Spacer()
+                        Button(String(localized: "Clear All")) {
+                            model.results.removeAll()
                         }
-                    } header: {
-                        HStack {
-                            Text("Results")
-                            Spacer()
-                            Button("Clear All") {
-                                model.results.removeAll()
-                            }
-                            .font(.caption)
-                        }
+                        .font(.caption)
                     }
                 }
             }
-            .navigationTitle("Inspector")
-            .navigationBarTitleDisplayMode(.large)
-            .alert(String(localized: "Error"), isPresented: Binding(
-                get: { model.errorMessage != nil },
-                set: { if !$0 { model.errorMessage = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(model.errorMessage ?? "")
-            }
+        }
+        .navigationTitle("System Inspector")
+        .navigationBarTitleDisplayMode(.large)
+        .alert(String(localized: "Error"), isPresented: Binding(
+            get: { model.errorMessage != nil },
+            set: { if !$0 { model.errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(model.errorMessage ?? "")
         }
     }
 }
@@ -200,6 +198,7 @@ private struct SystemFileResultSheet: View {
     let result: SystemFileResult
     @State private var displayMode: DisplayMode = .parsed
     @State private var exportedFileURL: URL?
+    @State private var exportError: String?
 
     enum DisplayMode: String, CaseIterable {
         case parsed, raw, hex
@@ -215,7 +214,7 @@ private struct SystemFileResultSheet: View {
                 }
                 .padding()
             }
-            .navigationTitle(result.target.title)
+            .navigationTitle(Text(result.target.title))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -243,9 +242,17 @@ private struct SystemFileResultSheet: View {
                 guard result.isSuccess, exportedFileURL == nil else { return }
                 let ext = (result.target.path as NSString).pathExtension.isEmpty
                     ? "txt" : (result.target.path as NSString).pathExtension
-                let fileName = "\(result.target.title).\(ext)"
-                let url = ExportFileManager.makeExportURL(fileName: fileName, data: result.data)
-                exportedFileURL = url
+                let fileName = "\(String(localized: result.target.title)).\(ext)"
+                do {
+                    let url = try ExportFileManager.makeExportURL(fileName: fileName, data: result.data)
+                    exportedFileURL = url
+                } catch {
+                    exportError = error.localizedDescription
+                }
+            }
+            if let exportError {
+                InlineErrorBanner(message: exportError)
+                    .padding(.horizontal)
             }
         }
     }
@@ -353,14 +360,27 @@ private struct SystemFileResultSheet: View {
         }
     }
 
+    // Cache hex string to avoid regenerating 8K bytes → 50K chars on every body re-evaluation.
+    @State private var hexStringCache: String?
+
     private var hexDisplay: some View {
-        let hex = result.data.prefix(8192).map { String(format: "%02x", $0) }
-            .chunked(into: 16).map { $0.joined(separator: " ") }
-            .joined(separator: "\n")
-        return Text(hex)
-            .font(.system(.caption2, design: .monospaced))
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        Group {
+            if let hexStringCache {
+                Text(hexStringCache)
+                    .font(.system(.caption2, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ProgressView()
+                    .onAppear {
+                        // Compute on next runloop tick to avoid blocking body
+                        let hex = result.data.prefix(8192).map { String(format: "%02x", $0) }
+                            .chunked(into: 16).map { $0.joined(separator: " ") }
+                            .joined(separator: "\n")
+                        hexStringCache = hex
+                    }
+            }
+        }
     }
 
     private var riskColor: Color {
@@ -381,15 +401,21 @@ struct PlistDisplayView: View {
     /// values are shown as a summary string instead of expanding.
     static let maxDepth = 12
 
+    // Cache sorted keys to avoid re-sorting the dictionary on every body re-evaluation.
+    @State private var sortedKeys: [String] = []
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(dict.keys.sorted(), id: \.self) { key in
+            ForEach(sortedKeys, id: \.self) { key in
                 PlistKeyRow(
                     key: key,
                     value: dict[key] ?? "",
                     depth: 0
                 )
             }
+        }
+        .onAppear {
+            sortedKeys = dict.keys.sorted()
         }
     }
 }

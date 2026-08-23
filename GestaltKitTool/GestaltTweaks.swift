@@ -49,34 +49,37 @@ struct GestaltTweakDefinition: Identifiable {
     let category: GestaltTweakCategory
     let title: String
     let detail: String
-    let values: [String: Any]
+    let values: [String: PlistValue]
     var isRisky = false
+    /// Cannot be reverted even by Factory Reset. Shows a stronger warning in the
+    /// confirmation dialog.
+    var isIrreversible = false
 }
 
 enum GestaltTweakCatalog {
     static let definitions: [GestaltTweakDefinition] = [
-        .init(id: .supportsDynamicIsland, category: .display, title: String(localized: "Enable Dynamic Island Capability"), detail: String(localized: "Nugget's alternate enable method."), values: ["YlEtTtHlNesRBMal1CqRaA": 1]),
-        .init(id: .alwaysOnDisplay, category: .display, title: String(localized: "Always-On Display"), detail: String(localized: "May increase burn-in risk on unsupported devices."), values: ["2OOJf1VhaM7NxfRok3HbWQ": 1, "j8/Omm6s1lsmTDFsXjsBfA": 1], isRisky: true),
-        .init(id: .alwaysOnDisplayVibrancy, category: .display, title: String(localized: "AOD Vibrancy"), detail: String(localized: "Use this when AOD rendering looks incorrect."), values: ["ykpu7qyhqFweVMKtxNylWA": 1]),
-        .init(id: .disableParallax, category: .display, title: String(localized: "Disable Wallpaper Parallax"), detail: String(localized: "Stops wallpaper motion based on device movement."), values: ["UIParallaxCapability": 0]),
-        .init(id: .enableLiquidGlassLowPerformance, category: .display, title: String(localized: "Enable Liquid Glass Low-Performance Mode"), detail: String(localized: "For iOS 26 and later."), values: ["SAGvsp6O6kAQ4fEfDJpC4Q": 1]),
-        .init(id: .disableLiquidGlassLowPerformance, category: .display, title: String(localized: "Disable Liquid Glass Low-Performance Mode"), detail: String(localized: "Mutually exclusive with the option above."), values: ["SAGvsp6O6kAQ4fEfDJpC4Q": 0]),
+        .init(id: .supportsDynamicIsland, category: .display, title: String(localized: "Enable Dynamic Island Capability"), detail: String(localized: "Alternate enable method."), values: ["YlEtTtHlNesRBMal1CqRaA": .int(1)]),
+        .init(id: .alwaysOnDisplay, category: .display, title: String(localized: "Always-On Display"), detail: String(localized: "May increase burn-in risk on unsupported devices."), values: ["2OOJf1VhaM7NxfRok3HbWQ": .int(1), "j8/Omm6s1lsmTDFsXjsBfA": .int(1)], isRisky: true),
+        .init(id: .alwaysOnDisplayVibrancy, category: .display, title: String(localized: "AOD Vibrancy"), detail: String(localized: "Use this when AOD rendering looks incorrect."), values: ["ykpu7qyhqFweVMKtxNylWA": .int(1)]),
+        .init(id: .disableParallax, category: .display, title: String(localized: "Disable Wallpaper Parallax"), detail: String(localized: "Stops wallpaper motion based on device movement."), values: ["UIParallaxCapability": .int(0)]),
+        .init(id: .enableLiquidGlassLowPerformance, category: .display, title: String(localized: "Enable Liquid Glass Low-Performance Mode"), detail: String(localized: "For iOS 26 and later."), values: ["SAGvsp6O6kAQ4fEfDJpC4Q": .int(1)]),
+        .init(id: .disableLiquidGlassLowPerformance, category: .display, title: String(localized: "Disable Liquid Glass Low-Performance Mode"), detail: String(localized: "Mutually exclusive with the option above."), values: ["SAGvsp6O6kAQ4fEfDJpC4Q": .int(0)]),
 
-        .init(id: .bootChime, category: .hardware, title: String(localized: "Boot & Shutdown Chime"), detail: String(localized: "Enables the device boot and shutdown chime capability."), values: ["QHxt+hGLaBPbQJbXiUJX3w": 1]),
-        .init(id: .chargeLimit, category: .hardware, title: String(localized: "Charge Limit Menu"), detail: String(localized: "Shows the Settings menu; actual limiting depends on hardware."), values: ["37NVydb//GP/GrhuTN+exg": 1]),
-        .init(id: .tapToWake, category: .hardware, title: String(localized: "Tap to Wake"), detail: String(localized: "Primarily for models such as iPhone SE where it is unavailable."), values: ["yZf3GTRMGTuwSV/lD7Cagw": 1]),
-        .init(id: .cameraButton, category: .hardware, title: String(localized: "iPhone 16 Camera Control Settings"), detail: String(localized: "Shows Camera Control settings and related capabilities."), values: ["CwvKxM2cEogD3p+HYgaW0Q": 1, "oOV1jhJbdV3AddkcCg0AEA": 1]),
-        .init(id: .pencil, category: .hardware, title: String(localized: "Apple Pencil Settings"), detail: String(localized: "Shows the Apple Pencil settings page."), values: ["yhHcB0iH0d1XzPO/CFd3ow": 1]),
-        .init(id: .actionButton, category: .hardware, title: String(localized: "Action Button Settings"), detail: String(localized: "Shows the Action Button settings page."), values: ["cT44WE1EohiwRzhsZ8xEsw": 1]),
-        .init(id: .collisionSOS, category: .hardware, title: String(localized: "Collision SOS"), detail: String(localized: "Shows collision detection in SOS settings."), values: ["HCzWusHQwZDea6nNhaKndw": 1]),
+        .init(id: .bootChime, category: .hardware, title: String(localized: "Boot & Shutdown Chime"), detail: String(localized: "Enables the device boot and shutdown chime capability."), values: ["QHxt+hGLaBPbQJbXiUJX3w": .int(1)]),
+        .init(id: .chargeLimit, category: .hardware, title: String(localized: "Charge Limit Menu"), detail: String(localized: "Shows the Settings menu; actual limiting depends on hardware."), values: ["37NVydb//GP/GrhuTN+exg": .int(1)]),
+        .init(id: .tapToWake, category: .hardware, title: String(localized: "Tap to Wake"), detail: String(localized: "Primarily for models such as iPhone SE where it is unavailable."), values: ["yZf3GTRMGTuwSV/lD7Cagw": .int(1)]),
+        .init(id: .cameraButton, category: .hardware, title: String(localized: "iPhone 16 Camera Control Settings"), detail: String(localized: "Shows Camera Control settings and related capabilities."), values: ["CwvKxM2cEogD3p+HYgaW0Q": .int(1), "oOV1jhJbdV3AddkcCg0AEA": .int(1)]),
+        .init(id: .pencil, category: .hardware, title: String(localized: "Apple Pencil Settings"), detail: String(localized: "Shows the Apple Pencil settings page."), values: ["yhHcB0iH0d1XzPO/CFd3ow": .int(1)]),
+        .init(id: .actionButton, category: .hardware, title: String(localized: "Action Button Settings"), detail: String(localized: "Shows the Action Button settings page."), values: ["cT44WE1EohiwRzhsZ8xEsw": .int(1)]),
+        .init(id: .collisionSOS, category: .hardware, title: String(localized: "Collision SOS"), detail: String(localized: "Shows collision detection in SOS settings."), values: ["HCzWusHQwZDea6nNhaKndw": .int(1)]),
 
-        .init(id: .stageManager, category: .ipad, title: String(localized: "Stage Manager Support"), detail: String(localized: "Marks the device as supporting Stage Manager."), values: ["qeaj75wk3HF4DwQ8qbIi7g": 1]),
-        .init(id: .iPadApps, category: .ipad, title: String(localized: "Allow iPad Apps"), detail: String(localized: "Enables iPad app compatibility types on iPhone."), values: ["9MZ5AdH43csAUajl/dU+IQ": [1, 2]]),
-        .init(id: .iPadOS, category: .ipad, title: String(localized: "Enable iPadOS Mode"), detail: String(localized: "Changes five capabilities and CacheData; experimental and high risk."), values: ["mG0AnH/Vy1veoqoLRAIgTA": 1, "UCG5MkVahJxG1YULbbd5Bg": 1, "ZYqko/XM5zD3XBfN5RmaXA": 1, "nVh/gwNpy7Jv1NOk00CMrw": 1, "uKc7FPnEO++lVhHWHFlGbQ": 1], isRisky: true),
+        .init(id: .stageManager, category: .ipad, title: String(localized: "Stage Manager Support"), detail: String(localized: "Marks the device as supporting Stage Manager."), values: ["qeaj75wk3HF4DwQ8qbIi7g": .int(1)]),
+        .init(id: .iPadApps, category: .ipad, title: String(localized: "Allow iPad Apps"), detail: String(localized: "Enables iPad app compatibility types on iPhone."), values: ["9MZ5AdH43csAUaj/dU+IQ": .array([.int(1), .int(2)])]),
+        .init(id: .iPadOS, category: .ipad, title: String(localized: "Enable iPadOS Mode"), detail: String(localized: "Changes five capabilities and CacheData; experimental and high risk."), values: ["mG0AnH/Vy1veoqoLRAIgTA": .int(1), "UCG5MkVahJxG1YULbbd5Bg": .int(1), "ZYqko/XM5zD3XBfN5RmaXA": .int(1), "nVh/gwNpy7Jv1NOk00CMrw": .int(1), "uKc7FPnEO++lVhHWHFlGbQ": .int(1)], isRisky: true, isIrreversible: true),
 
-        .init(id: .internalInstall, category: .internalFeatures, title: String(localized: "Apple Internal Install"), detail: String(localized: "Enables internal capabilities such as Metal HUD; some services may misbehave."), values: ["EqrsVvjcYDdxHBiQmGhAWw": 1], isRisky: true),
-        .init(id: .internalStorage, category: .internalFeatures, title: String(localized: "Internal Storage View"), detail: String(localized: "Shows internal files in Storage settings; high risk on some iPads."), values: ["LBJfwOEzExRxzlAnSuI7eg": 1], isRisky: true),
-        .init(id: .securityResearchDevice, category: .internalFeatures, title: String(localized: "Security Research Device Mode"), detail: String(localized: "Marks the device as a Security Research Device."), values: ["XYlJKKkj2hztRP1NWWnhlw": 1], isRisky: true)
+        .init(id: .internalInstall, category: .internalFeatures, title: String(localized: "Apple Internal Install"), detail: String(localized: "Enables internal capabilities such as Metal HUD; some services may misbehave."), values: ["EqrsVvjcYDdxHBiQmGhAWw": .int(1)], isRisky: true),
+        .init(id: .internalStorage, category: .internalFeatures, title: String(localized: "Internal Storage View"), detail: String(localized: "Shows internal files in Storage settings; high risk on some iPads."), values: ["LBJfwOEzExRxzlAnSuI7eg": .int(1)], isRisky: true),
+        .init(id: .securityResearchDevice, category: .internalFeatures, title: String(localized: "Security Research Device Mode"), detail: String(localized: "Marks the device as a Security Research Device."), values: ["XYlJKKkj2hztRP1NWWnhlw": .int(1)], isRisky: true)
     ]
 
     static func definition(for id: GestaltTweakID) -> GestaltTweakDefinition? {
@@ -111,7 +114,7 @@ enum GestaltTweakError: LocalizedError {
         case .artworkDictionaryMissing: String(localized: "MobileGestalt is missing the ArtworkDevice dictionary, so Dynamic Island or model name cannot be changed.")
         case .cacheDataMissing: String(localized: "MobileGestalt is missing CacheData, so iPadOS mode cannot be enabled.")
         case .cacheDataTooShort: String(localized: "CacheData is too short to apply iPadOS mode safely.")
-        case .cacheDataPatternNotFound: String(localized: "The iPadOS marker required by Nugget was not found in CacheData.")
+        case .cacheDataPatternNotFound: String(localized: "The required iPadOS marker was not found in CacheData.")
         case .invalidCacheDataOffset: String(localized: "CacheData marker validation failed. No changes were made.")
         }
     }
@@ -120,7 +123,7 @@ enum GestaltTweakError: LocalizedError {
 extension GestaltPlist {
     mutating func apply(definition: GestaltTweakDefinition) throws {
         for (key, value) in definition.values {
-            setCacheExtra(value, forKey: key)
+            setCacheExtra(value.asAny, forKey: key)
         }
         if definition.id == .iPadOS {
             try enableIPadOSCacheData()
@@ -147,21 +150,22 @@ extension GestaltPlist {
     }
 
     /// Returns the "disabled" counterpart of a tweak value.
-    /// - `1` → `0` (capability flag off)
-    /// - `0` → `1` (if the tweak itself was a "disable" type)
+    /// - `.int(1)` → `.int(0)` (capability flag off)
+    /// - `.int(0)` → `.int(1)` (if the tweak itself was a "disable" type)
     /// - Arrays → empty array
     /// - Other values are returned as-is (no known opposite).
-    private func opposite(of value: Any) -> Any {
-        if let n = value as? NSNumber {
-            if n.intValue == 1 { return NSNumber(value: 0) }
-            if n.intValue == 0 { return NSNumber(value: 1) }
+    private func opposite(of value: PlistValue) -> Any {
+        switch value {
+        case .int(let n):
+            if n == 1 { return 0 }
+            if n == 0 { return 1 }
             return n
-        }
-        if value is NSArray {
+        case .array:
             // Array values (e.g. iPadApps [1,2]) → empty array = disabled
-            return NSArray()
+            return [Any]()
+        default:
+            return value.asAny
         }
-        return value
     }
 
     mutating func setDynamicIslandSubtype(_ subtype: Int) throws {

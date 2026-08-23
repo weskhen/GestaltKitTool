@@ -11,28 +11,13 @@
 "Support SUSS" = "赞赏 SUSS";
 "Fields" = "字段";
 "Backups" = "备份";
-"Restore" = "恢复";
-"OK" = "好";
-"Enable Siri AI (US Region)" = "启用 Siri AI（美国地区）";
 "Unsupported device: force enable with device identity spoofing. Face ID or system stability may be affected." = "当前设备不受支持：将通过设备身份伪装强制开启，可能影响 Face ID 或系统稳定性。";
 "This device does not officially support Siri AI. Force enabling spoofs the product, hardware, and CPU model. It may temporarily break Face ID, cause system instability or boot loops, and could require restoring the device. A backup will be created before writing." = "此设备并未正式支持 Siri AI。强制开启会伪装产品型号、硬件型号与 CPU 型号，可能暂时导致 Face ID 失效、系统不稳定或无限重启，并可能需要恢复设备。写入前会自动创建备份。";
 "Reading MobileGestalt…" = "正在读取 MobileGestalt…";
 "Unable to read MobileGestalt" = "无法读取 MobileGestalt";
-"Unsupported iOS Version" = "不支持的 iOS 版本";
-"GestaltKitTool currently supports only iOS 27 beta 1 through beta 4." = "GestaltKitTool 目前仅支持 iOS 27 beta 1 至 beta 4。";
 "Reload" = "重新读取";
-"Connected" = "已连接";
 "Current Device" = "当前设备";
-"Device Subtype" = "设备子类型";
-"No Change" = "不修改";
-"Dynamic Island" = "灵动岛";
-"Selecting a subtype writes ArtworkDeviceSubType and the Dynamic Island support flag." = "选择后会同时写入 ArtworkDeviceSubType 与灵动岛支持标记。";
-"Device Name" = "设备名称";
-"Change model name in About" = "修改“关于本机”中的型号名称";
-"Model Name" = "型号名称";
 "%d pending changes" = "%d 项待写入";
-"Automatic backup before writing" = "写入前自动备份";
-"Apply" = "应用";
 "High Risk" = "高风险";
 
 "Back Up Current MobileGestalt" = "备份当前 MobileGestalt";
@@ -40,10 +25,7 @@
 "Importing only adds a file to the backup library. It does not write immediately. The original plist is also backed up before every write." = "导入只会将文件加入备份库，不会立即写入。每次写入前也会自动备份原始 plist。";
 "Local Backups" = "本机备份";
 "No Backups" = "暂无备份";
-"Restore This MobileGestalt Backup?" = "恢复这份 MobileGestalt 备份？";
-"Restore and Write" = "恢复并写入";
-"Cancel" = "取消";
-"The current file will be backed up first. SpringBoard will refresh automatically after restoring." = "恢复前会先备份当前文件。恢复完成后会自动刷新 SpringBoard。";
+"Create a backup before making changes so you can roll back at any time." = "在做任何修改前先创建备份，以便随时回退。";
 "Export Backup" = "导出备份";
 "Restore Backup" = "恢复备份";
 
@@ -51,7 +33,8 @@
 "Full plist snapshot" = "整机快照";
 "Field-level patches" = "字段补丁";
 "A backup is a full snapshot of this device's MobileGestalt plist, including device-identity fields. Use it to roll back before risky changes. Do not share across devices — restoring it on another device would overwrite its identity." = "备份是本机 MobileGestalt plist 的完整快照，包含设备身份字段。用于风险操作前的回滚。请勿跨设备分享——在另一台设备上恢复会覆盖其身份字段。";
-"A patch is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "补丁是设备无关的 CacheExtra 字段集合，会合并到当前 plist，不触碰设备身份。可跨设备分享，适合传播 tweak 组合。";
+"A patch is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "补丁是设备无关的 CacheExtra 字段集合，合并到当前 plist，不触碰设备身份。可跨设备分享，用于传播 tweak 组合。";
+
 
 "Search key or value" = "搜索键或值";
 "Add CacheExtra Field" = "新增 CacheExtra 字段";
@@ -63,9 +46,7 @@
 "Type" = "类型";
 "Value" = "值";
 "Delete Field" = "删除字段";
-"Done" = "完成";
 "Delete CacheExtra Field?" = "删除 CacheExtra 字段？";
-"Delete" = "删除";
 "The field will be removed from the file after you return to the editor and tap Save." = "返回编辑器并点击“保存”后，此字段才会从文件中删除。";
 "Field" = "字段";
 "Location" = "位置";
@@ -96,10 +77,9 @@
 "Region" = "地区";
 "Internal & Research" = "内部与研究";
 "Enable Dynamic Island Capability" = "启用灵动岛能力";
-"Nugget's alternate enable method." = "Nugget 的备用启用方式。";
+"Alternate enable method." = "备用启用方式。";
 "Always-On Display" = "全天候显示";
 "May increase burn-in risk on unsupported devices." = "在不支持的设备上可能增加烧屏风险。";
-"AOD Vibrancy" = "全天候显示鲜明度";
 "Use this when AOD rendering looks incorrect." = "AOD 显示异常时使用。";
 "Disable Wallpaper Parallax" = "停用墙纸视差";
 "Stops wallpaper motion based on device movement." = "关闭墙纸随设备移动的视差效果。";
@@ -107,31 +87,20 @@
 "For iOS 26 and later." = "适用于 iOS 26 及更新系统。";
 "Disable Liquid Glass Low-Performance Mode" = "停用液态玻璃低性能模式";
 "Mutually exclusive with the option above." = "与上方选项互斥。";
-"Boot & Shutdown Chime" = "启动与关机提示音";
 "Enables the device boot and shutdown chime capability." = "启用设备启动和关机提示音能力。";
-"Charge Limit Menu" = "充电上限菜单";
 "Shows the Settings menu; actual limiting depends on hardware." = "显示设置菜单；实际限制能力取决于硬件。";
-"Tap to Wake" = "轻点唤醒";
 "Primarily for models such as iPhone SE where it is unavailable." = "主要用于 iPhone SE 等未开放此功能的机型。";
 "iPhone 16 Camera Control Settings" = "iPhone 16 相机控制设置";
 "Shows Camera Control settings and related capabilities." = "显示相机控制设置及相关能力。";
-"Apple Pencil Settings" = "Apple Pencil 设置";
 "Shows the Apple Pencil settings page." = "显示 Apple Pencil 设置页。";
-"Action Button Settings" = "操作按钮设置";
 "Shows the Action Button settings page." = "显示操作按钮设置页。";
-"Collision SOS" = "碰撞检测 SOS";
 "Shows collision detection in SOS settings." = "在 SOS 设置中显示碰撞检测。";
-"Stage Manager Support" = "台前调度支持";
 "Marks the device as supporting Stage Manager." = "标记设备支持台前调度。";
-"Allow iPad Apps" = "允许安装 iPad App";
 "Enables iPad app compatibility types on iPhone." = "在 iPhone 上开放 iPad App 兼容类型。";
 "Enable iPadOS Mode" = "启用 iPadOS 模式";
 "Changes five capabilities and CacheData; experimental and high risk." = "同时修改五项能力与 CacheData；此功能为实验性且风险较高。";
-"Apple Internal Install" = "Apple 内部安装";
 "Enables internal capabilities such as Metal HUD; some services may misbehave." = "开放 Metal HUD 等内部能力；部分系统服务可能异常。";
-"Internal Storage View" = "内部存储视图";
 "Shows internal files in Storage settings; high risk on some iPads." = "在储存空间设置中显示内部文件；部分 iPad 风险较高。";
-"Security Research Device Mode" = "安全研究设备模式";
 "Marks the device as a Security Research Device." = "将设备标记为安全研究设备。";
 "iPhone X Gestures (SE)" = "iPhone X 手势（SE）";
 
@@ -143,11 +112,14 @@
 "The backup is not a valid MobileGestalt plist." = "该备份不是有效的 MobileGestalt plist。";
 "The MobileGestalt values after writing do not match the expected values." = "写入后的 MobileGestalt 值与预期不一致。";
 "The device model name cannot be empty." = "设备型号名称不能为空。";
+"Model name too long (max %d characters)." = "型号名称过长（最多 %d 个字符）。";
+"Model name contains invalid characters (allowed: letters, numbers, spaces, -.,()'')" = "型号名称包含无效字符（允许：字母、数字、空格、-.,()')";
+"%d/%d characters" = "%d/%d 字符";
 
 "MobileGestalt is missing the ArtworkDevice dictionary, so Dynamic Island or model name cannot be changed." = "MobileGestalt 缺少 ArtworkDevice 字典，因此无法修改灵动岛或型号名称。";
 "MobileGestalt is missing CacheData, so iPadOS mode cannot be enabled." = "MobileGestalt 缺少 CacheData，因此无法启用 iPadOS 模式。";
 "CacheData is too short to apply iPadOS mode safely." = "CacheData 太短，无法安全应用 iPadOS 模式。";
-"The iPadOS marker required by Nugget was not found in CacheData." = "在 CacheData 中找不到 Nugget 所需的 iPadOS 标记。";
+"The required iPadOS marker was not found in CacheData." = "在 CacheData 中找不到所需的 iPadOS 标记。";
 "CacheData marker validation failed. No changes were made." = "CacheData 标记验证失败，未进行任何更改。";
 
 "bad_query is unavailable (required ContainerManager or sandbox extension APIs are missing)." = "bad_query 不可用（缺少所需的 ContainerManager 或沙盒扩展 API）。";
@@ -167,21 +139,14 @@
 "Post-write verification failed." = "写入后验证失败。";
 
 /* Settings */
-"Settings" = "设置";
 "Language" = "语言";
 "Follow System" = "跟随系统";
 "Changes take effect on the next app launch." = "更改将在下次启动 App 时生效。";
 "Restart the app for the new language to take effect." = "请重启 App 以使新语言生效。";
 
 /* System Info */
-"System Version" = "系统版本";
-"Supported" = "已支持";
-"Unsupported" = "不支持";
-"Build" = "Build";
-"Unknown" = "未知";
 
 /* File Explorer */
-"Explorer" = "浏览器";
 "App Sandboxes" = "应用沙盒";
 "Each entry is another app's private data container. bad_query bypasses the sandbox to list and read these directories." = "每个条目都是其他应用的私有数据容器。bad_query 绕过沙盒限制来列举和读取这些目录。";
 "Scanning app containers…" = "正在扫描应用容器…";
@@ -200,7 +165,6 @@
 "Size" = "大小";
 "Modified" = "修改时间";
 "Extension" = "扩展名";
-"About" = "说明";
 "Property List" = "属性列表";
 "JSON" = "JSON";
 "SQLite Database" = "SQLite 数据库";
@@ -212,19 +176,18 @@
 "Dynamic Library" = "动态库";
 "Framework Bundle" = "框架包";
 "A directory (folder). Tap to navigate into it and view its contents." = "目录（文件夹）。点击可进入并查看其内容。";
-"An Apple property list file. Contains structured key-value data, typically used for application settings, preferences, and configuration. Can be in binary or XML format." = "Apple 属性列表文件。包含结构化键值数据，通常用于应用设置、偏好和配置。可以是二进制或 XML 格式。";
-"A JSON (JavaScript Object Notation) data file. Contains structured data in a human-readable text format, commonly used for app data export, API responses, and configuration." = "JSON 数据文件。包含人类可读的结构化文本数据，常用于应用数据导出、API 响应和配置。";
-"An SQLite database file. Contains structured data in tables, indexes, and schemas. May store app data, caches, or metadata. Binary format — view in hex mode for raw inspection." = "SQLite 数据库文件。包含表、索引和模式中的结构化数据。可能存储应用数据、缓存或元数据。二进制格式——可用十六进制模式查看原始内容。";
-"A plain text file. Contains unformatted text data, readable directly. May include logs, notes, or configuration data." = "纯文本文件。包含可直接读取的未格式化文本数据。可能包括日志、笔记或配置数据。";
-"A log file. Contains timestamped application or system events, useful for debugging and diagnostics. Plain text format." = "日志文件。包含带时间戳的应用或系统事件，用于调试和诊断。纯文本格式。";
-"An image file. Contains raster graphics data. Can be previewed directly in the file viewer. Common formats include PNG, JPEG, and HEIC (Apple's high-efficiency format)." = "图片文件。包含栅格图形数据。可在文件查看器中直接预览。常见格式包括 PNG、JPEG 和 HEIC（Apple 高效格式）。";
-"An XML (eXtensible Markup Language) file. Contains structured text data with tags, used for configuration, data interchange, and property lists in text format." = "XML 文件。包含带标签的结构化文本数据，用于配置、数据交换和文本格式的属性列表。";
-"A dynamic library (shared object). Contains compiled machine code loaded at runtime. Binary format — view in hex mode for raw inspection." = "动态库（共享对象）。包含运行时加载的编译机器码。二进制格式——可用十六进制模式查看原始内容。";
-"A framework bundle directory. Contains a dynamic library and associated resources (headers, plists). Tap to browse its contents." = "框架包目录。包含动态库和相关资源（头文件、plist）。点击可浏览其内容。";
-"A file in the device filesystem. Tap to preview its contents. The file type is not specifically recognized — it may be shown as text or binary data." = "设备文件系统中的文件。点击可预览其内容。文件类型未被特别识别——可能显示为文本或二进制数据。";
+"An Apple property list file. Contains structured key-value data, typically used for application settings, preferences, and configuration. Can be in binary or XML format." = "Apple 属性列表文件。二进制或 XML 格式。存放设置、偏好、配置等键值数据。";
+"A JSON (JavaScript Object Notation) data file. Contains structured data in a human-readable text format, commonly used for app data export, API responses, and configuration." = "JSON 文件。纯文本。用于导出、API 响应、配置。";
+"An SQLite database file. Contains structured data in tables, indexes, and schemas. May store app data, caches, or metadata. Binary format — view in hex mode for raw inspection." = "SQLite 数据库。表、索引、模式。二进制——可用十六进制模式查看。";
+"A plain text file. Contains unformatted text data, readable directly. May include logs, notes, or configuration data." = "纯文本文件。未格式化文本，可直接读取。";
+"A log file. Contains timestamped application or system events, useful for debugging and diagnostics. Plain text format." = "日志文件。带时间戳的事件。纯文本。";
+"An image file. Contains raster graphics data. Can be previewed directly in the file viewer. Common formats include PNG, JPEG, and HEIC (Apple's high-efficiency format)." = "图片文件。PNG / JPEG / HEIC。支持预览。";
+"An XML (eXtensible Markup Language) file. Contains structured text data with tags, used for configuration, data interchange, and property lists in text format." = "XML 文件。标签文本格式。用于配置、交换、文本 plist。";
+"A dynamic library (shared object). Contains compiled machine code loaded at runtime. Binary format — view in hex mode for raw inspection." = "动态库（共享对象）。编译机器码，运行时加载。二进制——可用十六进制模式查看。";
+"A framework bundle directory. Contains a dynamic library and associated resources (headers, plists). Tap to browse its contents." = "框架包。动态库 + 资源（头文件、plist）。点击浏览。";
+"A file in the device filesystem. Tap to preview its contents. The file type is not specifically recognized — it may be shown as text or binary data." = "未知文件类型。点击预览——显示为文本或二进制。";
 
 /* System Inspector */
-"Inspector" = "检查器";
 "These files contain sensitive system data. Reading them demonstrates the full impact of bad_query sandbox escape." = "这些文件包含敏感系统数据。读取它们展示了 bad_query 沙盒逃逸的完整影响。";
 "Identity & Gestalt" = "身份与 Gestalt";
 "System Containers" = "系统容器";
@@ -233,7 +196,6 @@
 "System Groups" = "系统组";
 "MobileGestalt Cache" = "MobileGestalt 缓存";
 "App Data" = "应用数据";
-"App Groups" = "应用组";
 "Internal Daemon" = "内部守护进程";
 "PluginKit Plugins" = "PluginKit 插件";
 "Network Configuration" = "网络配置";
@@ -306,7 +268,6 @@
 "No matching files." = "没有匹配的文件。";
 "Search Results" = "搜索结果";
 "Matches" = "匹配项";
-"No matching files found." = "未找到匹配的文件。";
 
 /* Error messages */
 "Error" = "错误";
@@ -333,10 +294,6 @@
 
 /* Factory reset */
 "Restore Factory Settings" = "恢复出厂设置";
-"Restore Factory Settings?" = "恢复出厂设置？";
-"Restore Factory" = "恢复出厂";
-"All tweaks will be disabled and written to the plist. A backup of the current state is created automatically. This does not revert iPadOS CacheData patches — use backup restore for that." = "所有调整项将被禁用并写入 plist。系统会自动备份当前状态。此操作不会还原 iPadOS CacheData 补丁——请使用备份恢复来处理。";
-"Restore Factory Settings disables all tweaks by writing default values. A backup is created automatically before writing. iPadOS CacheData patches are not reversible — use backup restore for that." = "恢复出厂设置会写入默认值来禁用所有调整项。写入前会自动创建备份。iPadOS CacheData 补丁不可逆——请使用备份恢复。";
 
 /* Optimization: file size guard, path validation, batch delete */
 "File is too large to preview (%.1f MB). Limit is %.0f MB." = "文件过大，无法预览（%.1f MB）。限制为 %.0f MB。";
@@ -344,7 +301,6 @@
 "Path contains invalid characters" = "路径包含无效字符";
 "Path contains control characters" = "路径包含控制字符";
 "Delete %d" = "删除 %d";
-"Delete %d backups?" = "删除 %d 个备份？";
 "This action cannot be undone." = "此操作无法撤销。";
 "GIF Image" = "GIF 图片";
 "Image" = "图片";
@@ -364,7 +320,6 @@
 "Any Type" = "任意类型";
 "Plist" = "Plist";
 "Database" = "数据库";
-"Archive" = "压缩包";
 "Binary" = "二进制";
 
 /* ——— 搜索进度与计数 ——— */
@@ -409,7 +364,7 @@
 "App container root" = "应用容器根目录";
 "Top-level container for a single app's sandbox. Files you see here are the ones created by the app: Documents, Library, tmp. Empty subdirectories mean the app hasn't exercised that code path yet." = "单个应用沙盒的顶层容器，这里的文件就是应用实际创建的 Documents、Library、tmp 等。子目录为空意味着对应代码路径尚未被应用运行过。";
 
-/* ── MobileGestalt 顶栏设备信息 & Tab 标签 ──────────────── */
+/*  MobileGestalt 顶栏设备信息 & Tab 标签  */
 "Explorer" = "文件";
 "Inspector" = "诊断";
 "Settings" = "设置";
@@ -423,53 +378,51 @@
 "Connected" = "已连接";
 "No Change" = "不修改";
 
-/* ── 灵动岛 & 设备名称区块 ─────────────────────────────── */
+/*  灵动岛 & 设备名称区块  */
 "Device Name" = "设备名称";
 "Change model name in About" = "修改「关于本机」中的型号名称";
-"Model Name" = "型号名称";
 "Device Subtype" = "设备子类型";
 "Dynamic Island" = "灵动岛";
 "Selecting a subtype writes ArtworkDeviceSubType and the Dynamic Island support flag." = "选择后会同时写入 ArtworkDeviceSubType 与灵动岛支持标记。";
 
-/* ── 应用栏 ───────────────────────────────────────────── */
+/*  应用栏  */
 "Apply" = "应用";
 "Automatic backup before writing" = "写入前自动备份";
+"Working…" = "处理中…";
 "OK" = "好";
-"Cancel" = "取消";
 
-/* ── 恢复出厂设置流程 ─────────────────────────────────── */
+/*  恢复出厂设置流程  */
 "Restore Factory Settings?" = "恢复出厂设置？";
 "Restore Factory" = "恢复出厂";
 "All tweaks will be disabled and written to the plist. A backup of the current state is created automatically. This does not revert iPadOS CacheData patches — use backup restore for that." = "所有 tweak 将被禁用并写入 plist，过程中会自动备份当前状态。本操作不会撤销 iPadOS CacheData 类补丁——如需回退请使用备份恢复。";
 "Restore Factory Settings disables all tweaks by writing default values. A backup is created automatically before writing. iPadOS CacheData patches are not reversible — use backup restore for that." = "「恢复出厂设置」通过写入默认值关闭所有 tweak，写入前会自动备份。iPadOS CacheData 类补丁不可以此回退——请使用备份恢复。";
 
-/* ── 不受支持的系统版本屏 ─────────────────────────────── */
+/*  不受支持的系统版本屏  */
 "Unsupported iOS Version" = "iOS 版本不受支持";
 "GestaltKitTool currently supports only iOS 27 beta 1 through beta 4." = "GestaltKitTool 目前仅支持 iOS 27 beta 1 至 beta 4。";
 
-/* ── Siri AI 开关 ────────────────────────────────────── */
+/*  Siri AI 开关  */
 "Enable Siri AI (US Region)" = "启用 Siri AI（美国地区）";
 
-/* ── 备份库流程 ──────────────────────────────────────── */
+/*  备份库流程  */
 "Restore This MobileGestalt Backup?" = "恢复这份 MobileGestalt 备份？";
 "Restore and Write" = "恢复并写入";
 "The current file will be backed up first. SpringBoard will refresh automatically after restoring." = "恢复前会先备份当前文件，完成后 SpringBoard 会自动刷新。";
 "Delete %d backups?" = "删除 %d 份备份？";
-"Delete" = "删除";
 "Restore" = "恢复";
 
-/* ── 补丁导出流程 ────────────────────────────────────── */
+/*  补丁导出流程  */
 "Search keys…" = "搜索键…";
 "Export Patch" = "导出补丁";
 "Name Required" = "需要填写名称";
 "Please give this patch a name before exporting." = "请先给这份补丁取个名称再导出。";
 
-/* ── 补丁库流程 ──────────────────────────────────────── */
+/*  补丁库流程  */
 "Apply This Patch?" = "应用这份补丁？";
 "Apply and Write" = "应用并写入";
 "The patch's CacheExtra fields will be merged onto the current plist. A backup is created automatically before writing. SpringBoard will refresh after writing." = "补丁的 CacheExtra 字段会合并到当前 plist，写入前自动备份，完成后 SpringBoard 会自动刷新。";
 
-/* ── Archive (CR-30 复制式归档, bad_query 仅提供只读访问) ────────── */
+/*  Archive (复制式归档, bad_query 仅提供只读访问)  */
 "Local Storage" = "本地存储";
 "GestaltKitTool's copy-style archive. Snapshots of files/directories read via bad_query are stored here (Documents/GestaltKitTool Archive). Source files are NOT moved or deleted — bad_query provides read-only access, so Archive copies instead of moving." = "GestaltKitTool 的复制式归档。通过 bad_query 读取的文件/目录快照保存在这里 (Documents/GestaltKitTool Archive)。源文件不会被移动或删除——bad_query 仅提供只读访问,因此归档采用复制而非移动方式。";
 "Copy to Archive" = "复制到归档";
@@ -483,3 +436,434 @@
 "Delete" = "删除";
 "Cancel" = "取消";
 
+/*  缺失的本地化键  */
+
+/* Tab 栏 */
+"Presets" = "预设";
+
+/* Tools 标签页 */
+"Quick Actions" = "快捷操作";
+"Configuration" = "配置";
+"Actions write to MobileGestalt.plist. Auto-backup before every write." = "操作将写入 MobileGestalt.plist。每次写入前自动备份。";
+"Status Report" = "状态报告";
+"Undo Last Write" = "撤销上次写入";
+"Danger Zone" = "危险区域";
+"Undo restores the backup created before the most recent write. Factory Reset disables all tweaks. Neither reverts iPadOS CacheData patches." = "撤销会恢复最近一次写入前创建的备份。恢复出厂设置会关闭所有调整项。两者均不可回退 iPadOS CacheData 补丁。";
+
+/* 预设 */
+"No saved presets. Configure tweaks above, then save a preset for quick reuse." = "暂无已保存的预设。先配置上方的调整项，再保存预设以便快速复用。";
+"%d tweaks" = "%d 项调整";
+"Save your current tweak selections for one-tap reuse." = "保存当前调整项选择，一键复用。";
+"Preset Saved" = "预设已保存";
+"Preset name" = "预设名称";
+"Create Preset" = "创建预设";
+"Captures all currently selected tweaks." = "捕获当前所有已选调整项。";
+"Built-in" = "内置";
+"Your Presets" = "你的预设";
+"No saved presets yet." = "暂无已保存的预设。";
+
+/* 共享配置 */
+"Shared Profiles" = "共享配置";
+"Field-level configs" = "字段级配置";
+"A shared profile is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "共享配置是设备无关的 CacheExtra 字段集合，合并到当前 plist，不触碰设备身份。可跨设备分享，用于传播 tweak 组合。";
+"Import Patch" = "导入补丁";
+"Export Patch…" = "导出补丁…";
+"A patch contains only the CacheExtra fields the author chose to share. Importing applies it on top of the current plist and writes immediately. Export packages applied tweaks or hand-picked fields into a shareable .weskpatch." = "补丁仅包含作者选择分享的 CacheExtra 字段。导入时会叠加到当前 plist 并立即写入。导出时将已应用的调整项或手动选择的字段打包为可分享的 .weskpatch 文件。";
+"No Patches" = "暂无补丁";
+"Import a shared profile to apply a combination of CacheExtra fields. You can also export your own tweaks to share." = "导入共享配置以应用一组 CacheExtra 字段。你也可以导出自己的调整项进行分享。";
+"Local Patches" = "本地补丁";
+"Delete Profile?" = "删除配置？";
+"This profile cannot be recovered after deletion." = "删除后无法恢复此配置。";
+"Name (required)" = "名称（必填）";
+"Author (optional)" = "作者（选填）";
+"Notes" = "备注";
+"Patch Metadata" = "补丁元数据";
+"Include Applied Tweaks (%d keys)" = "包含已应用的调整项（%d 个键）";
+"Clear Selection (%d)" = "清除选择（%d）";
+"No matching keys" = "无匹配的键";
+"CacheExtra Keys (%d)" = "CacheExtra 键（%d）";
+"%d fields" = "%d 个字段";
+"Manual" = "手动";
+
+/* 备份库 */
+"Delete Backup?" = "删除备份？";
+"This backup cannot be recovered after deletion." = "删除后无法恢复此备份。";
+"Backup Preview" = "备份预览";
+"Label (optional)" = "标签（选填）";
+"Backup Label" = "备份标签";
+"Add a note to help identify this backup later." = "添加备注以便日后识别此备份。";
+"Backup Date" = "备份日期";
+"Edit Label" = "编辑标签";
+"Preview Backup" = "预览备份";
+
+/* 设置 — 工具 */
+"Utilities" = "实用工具";
+"Safe Cleanup" = "安全清理";
+"Safe Cleanup clears Library/Caches and tmp/ across all apps — your documents and preferences are never touched." = "安全清理会清除所有应用的 Library/Caches 和 tmp/ 目录——你的文档和偏好设置不会被触碰。";
+
+/* 浏览器 — 应用沙盒折叠 */
+"Browse all app data containers on device. Tap to open the full list with search." = "浏览设备上所有应用数据容器。点击打开完整列表并搜索。";
+"System Inspector" = "系统检查器";
+"App Backups" = "应用备份";
+"System Inspector reads sensitive system files. App Backups stores full data container copies." = "系统检查器读取敏感系统文件。应用备份存储完整数据容器副本。";
+"No matching containers." = "无匹配的容器。";
+"Filter by name or bundle ID" = "按名称或 Bundle ID 过滤";
+
+/* 浏览器 — 分类页 */
+"Quick Access" = "快速访问";
+"Documents" = "Documents";
+"Library" = "Library";
+"Caches" = "Caches";
+"Preferences" = "Preferences";
+"tmp" = "tmp";
+"Container" = "容器";
+"Container Root" = "容器根目录";
+"Browse All Files" = "浏览所有文件";
+"Back Up Container" = "备份容器";
+"Backing Up" = "备份中";
+
+/* 浏览器 — 批量操作 */
+"Select" = "选择";
+"Batch Operation" = "批量操作";
+"Archive" = "归档";
+"Restore to Export folder" = "恢复到导出目录";
+"Mode" = "模式";
+
+/* PlistViewerView */
+"Unable to parse property list." = "无法解析属性列表。";
+"Search keys" = "搜索键";
+"Int" = "整数";
+"Double" = "浮点";
+"Bool" = "布尔";
+"Date" = "日期";
+"Any" = "任意";
+
+/* StructuredFileViewers */
+"%d bytes total" = "共 %d 字节";
+"Page %d / %d" = "第 %d / %d 页";
+"Previous Page" = "上一页";
+"Next Page" = "下一页";
+"(Unable to decode as text)" = "（无法解码为文本）";
+"Unable to display image." = "无法显示图片。";
+
+/* SQLiteViewerView */
+"Reading database…" = "正在读取数据库…";
+"No tables found or file is not a valid SQLite database." = "未找到表，或文件不是有效的 SQLite 数据库。";
+"Select a table to view its contents." = "选择一个表查看其内容。";
+"Load More (%d remaining)" = "加载更多（剩余 %d 行）";
+"Showing %d of %d rows" = "显示 %d / %d 行";
+
+/* SystemInspectorView */
+"Read At" = "读取时间";
+"Risk" = "风险";
+"Status" = "状态";
+
+/* SystemInspectorModel 标题 */
+"MobileGestalt Cache Directory" = "MobileGestalt 缓存目录";
+"MobileGestalt SystemGroup Root" = "MobileGestalt 系统组根目录";
+"SystemGroup Containers" = "系统组容器";
+"System Data Containers" = "系统数据容器";
+"App Data Containers" = "应用数据容器";
+"App Group Containers" = "应用组容器";
+"InternalDaemon Containers" = "内部守护进程容器";
+"PluginKit Plugin Containers" = "PluginKit 插件容器";
+"App Bundle Containers" = "应用 Bundle 容器";
+
+/* GestaltViewModel */
+"No matching CacheExtra keys to export." = "没有匹配的 CacheExtra 键可导出。";
+"Exported patch %@ (%d fields)." = "已导出补丁 %@（%d 个字段）。";
+"(%d unencodable fields skipped.)" = "（跳过 %d 个无法编码的字段。）";
+"The patch file is invalid or uses an unsupported format version." = "补丁文件无效或使用了不受支持的格式版本。";
+
+/* PresetSheetView */
+"Built-in Presets" = "内置预设";
+"My Presets" = "我的预设";
+"Save Current as Preset" = "将当前配置保存为预设";
+"Save Preset" = "保存预设";
+"Preset Name" = "预设名称";
+"Save the current tweak selection, Dynamic Island subtype, model name, and AI Region setting as a reusable preset." = "将当前调整项选择、灵动岛子类型、型号名称和 AI 地区设置保存为可复用的预设。";
+
+/* WeskToolEnhancements — 内置预设名 */
+"iPhone Air Look" = "iPhone Air 外观";
+"iPad Mode on iPhone" = "iPhone 上的 iPad 模式";
+"Minimal Tweaks" = "精简调整";
+"Full Spoof" = "全量伪装";
+
+/* LanguageManager */
+"English" = "English";
+
+/* AppBackupExporter */
+"Some backups could not be deleted:" = "部分备份无法删除：";
+"Unknown error" = "未知错误";
+"Starting backup…" = "开始备份…";
+"%d files skipped" = "跳过 %d 个文件";
+"%d files failed to write" = "%d 个文件写入失败";
+"Export failed" = "导出失败";
+"Delete All" = "全部删除";
+"Delete All Backups?" = "删除全部备份？";
+"This will permanently remove all app backup data. This action cannot be undone." = "将永久删除所有应用备份数据。此操作无法撤销。";
+"Delete Error" = "删除错误";
+"No App Backups" = "暂无应用备份";
+"Back up any app's data container from the App Explorer. Backups are stored in GestaltKitTool's private container." = "从应用浏览器备份任意应用的数据容器。备份存储在 GestaltKitTool 的私有容器中。";
+"backups" = "份备份";
+"files" = "个文件";
+
+/* SafeCleanup */
+"Clean" = "清理";
+"Nothing to Clean" = "无需清理";
+"No app cache or temporary files were found. Your device is already clean." = "未找到应用缓存或临时文件。";
+"Rescan" = "重新扫描";
+"Total Cleanable" = "可清理总量";
+"apps" = "个应用";
+"Apps with Cache" = "有缓存的应用";
+"Summary" = "概要";
+"Safe Cleanup only removes Library/Caches and tmp/ directories. Your app data, documents, and preferences are never touched." = "安全清理仅删除 Library/Caches 和 tmp/ 目录。你的应用数据、文档和偏好设置不会被触碰。";
+"Apps" = "应用";
+"Clear Selection" = "清除选择";
+"Cleanup Complete" = "清理完成";
+"%d apps cleaned" = "已清理 %d 个应用";
+"%d items deleted" = "已删除 %d 项";
+"%@ freed so far" = "已释放 %@";
+
+/* BatchFileOperations */
+"Delete %d item%@?" = "删除 %d 项%@？";
+"Selected Items" = "已选项目";
+"Confirm Delete" = "确认删除";
+"Current:" = "当前：";
+"Errors" = "错误";
+"Current Directory" = "当前目录";
+"Quick Destinations" = "快捷目标";
+"Move to Custom Path" = "移动到自定义路径";
+"Move to…" = "移动到…";
+"App Groups" = "应用组";
+"GestaltKitTool Exports" = "GestaltKitTool 导出";
+"Cancel Selection" = "取消选择";
+"%d selected" = "已选 %d 项";
+"Export Selected" = "导出已选";
+"Move Selected" = "移动已选";
+"Delete Selected" = "删除已选";
+
+/* ArchiveManager 错误 */
+"Source file not found: %@" = "源文件未找到：%@";
+"Failed to read %@: %@" = "读取 %@ 失败：%@";
+"Failed to write %@: %@" = "写入 %@ 失败：%@";
+"Failed to enumerate directory: %@" = "枚举目录失败：%@";
+"Source is a directory but contents could not be listed: %@" = "源是目录但无法列出内容：%@";
+"An item with this name already exists in the archive: %@. Delete or rename the existing archive entry first." = "归档中已存在同名项目：%@。请先删除或重命名已有归档项。";
+"Cancelled" = "已取消";
+
+/* 系统支持消息 */
+"GestaltKitTool currently supports iOS 26.0–26.6.1 and iOS 27 beta 1–4." = "GestaltKitTool 目前支持 iOS 26.0–26.6.1 和 iOS 27 beta 1–4。";
+
+/* 已应用调整项预设描述 */
+"The applied-tweaks preset selects every CacheExtra key referenced by a tweak toggle that is currently ON. You can also manually browse and pick arbitrary keys below." = "已应用调整项预设会选择每个当前开启的调整项所引用的 CacheExtra 键。你也可以在下方手动浏览和选择任意键。";
+
+/*  CacheExtraKeyDictionary — 已知键描述  */
+
+/* 类别标签 */
+"Display" = "显示";
+"Hardware" = "硬件";
+"iPad" = "iPad";
+"Internal" = "内部";
+"Identity" = "身份";
+
+/* ArtworkDevice */
+"ArtworkDevice" = "ArtworkDevice";
+"Contains ArtworkDeviceSubType (Dynamic Island shape) and ArtworkDeviceProductDescription (model name in About). A nested dictionary — tap to edit individual sub-fields." = "包含 ArtworkDeviceSubType（灵动岛形状）和 ArtworkDeviceProductDescription（关于本机中的型号名称）。嵌套字典——点击编辑各子字段。";
+
+/* Display */
+"Dynamic Island Support Flag" = "灵动岛支持标志";
+"Enables Dynamic Island capability. Set to 1 to enable, 0 to disable. Used together with ArtworkDeviceSubType." = "启用灵动岛能力。设为 1 启用，0 禁用。需与 ArtworkDeviceSubType 配合使用。";
+"Always-On Display Flag 1" = "全天候显示标志 1";
+"First AOD capability flag. Set to 1 to enable Always-On Display. May increase burn-in risk on unsupported devices." = "第一个全天候显示能力标志。设为 1 启用。在不支持的设备上可能增加烧屏风险。";
+"Always-On Display Flag 2" = "全天候显示标志 2";
+"Second AOD capability flag. Set to 1 together with Flag 1 to fully enable AOD." = "第二个全天候显示能力标志。需与标志 1 同时设为 1 才能完全启用。";
+"AOD Vibrancy" = "全天候显示鲜明度";
+"Fixes AOD rendering issues on certain devices. Set to 1 when AOD looks dim or incorrect." = "修复某些设备上全天候显示的渲染问题。当 AOD 显示暗淡或异常时设为 1。";
+"Wallpaper Parallax" = "墙纸视差";
+"Controls wallpaper motion parallax based on device tilt. Set to 0 to disable, 1 to enable." = "控制墙纸随设备倾斜的视差效果。设为 0 禁用，1 启用。";
+"Liquid Glass Low-Performance Mode" = "液态玻璃低性能模式";
+"Controls the Liquid Glass low-performance rendering mode (iOS 26+). 1 = enabled, 0 = disabled. Enable/disable are mutually exclusive." = "控制液态玻璃低性能渲染模式（iOS 26+）。1 = 启用，0 = 禁用。启用与禁用互斥。";
+
+/* Hardware */
+"Boot & Shutdown Chime" = "开关机提示音";
+"Enables the device boot and shutdown sound. Set to 1 to enable." = "启用设备开机和关机提示音。设为 1 启用。";
+"Charge Limit Menu" = "充电上限菜单";
+"Shows the charge limit menu in Settings. Actual limiting depends on hardware support. Set to 1 to show." = "在设置中显示充电上限菜单。实际限制能力取决于硬件。设为 1 显示。";
+"Tap to Wake" = "轻点唤醒";
+"Enables tap-to-wake on devices where it's unavailable (e.g. iPhone SE). Set to 1 to enable." = "在未开放此功能的设备上启用轻点唤醒（如 iPhone SE）。设为 1 启用。";
+"Camera Control Settings 1" = "相机控制设置 1";
+"Shows iPhone 16 Camera Control settings page. Set to 1 together with the second key." = "显示 iPhone 16 相机控制设置页。需与第二个键同时设为 1。";
+"Camera Control Settings 2" = "相机控制设置 2";
+"Second Camera Control capability flag. Set to 1 together with the first key." = "第二个相机控制能力标志。需与第一个键同时设为 1。";
+"Apple Pencil Settings" = "Apple Pencil 设置";
+"Shows the Apple Pencil settings page. Set to 1 to enable." = "显示 Apple Pencil 设置页。设为 1 启用。";
+"Action Button Settings" = "操作按钮设置";
+"Shows the Action Button settings page. Set to 1 to enable." = "显示操作按钮设置页。设为 1 启用。";
+"Collision SOS" = "碰撞检测 SOS";
+"Shows collision detection in SOS settings. Set to 1 to enable." = "在 SOS 设置中显示碰撞检测。设为 1 启用。";
+
+/* iPad */
+"Stage Manager Support" = "台前调度支持";
+"Marks the device as supporting Stage Manager. Set to 1 to enable." = "标记设备支持台前调度。设为 1 启用。";
+"Allow iPad Apps" = "允许安装 iPad App";
+"Enables iPad app compatibility types on iPhone. Value is an array: [1, 2] = enabled, [] = disabled." = "在 iPhone 上开放 iPad App 兼容类型。值为数组：[1, 2] = 启用，[] = 禁用。";
+"iPadOS Mode Flag 1" = "iPadOS 模式标志 1";
+"First of five capability flags for iPadOS mode. Experimental and high risk — modifies CacheData." = "iPadOS 模式的五个能力标志之一。实验性且高风险——会修改 CacheData。";
+"iPadOS Mode Flag 2" = "iPadOS 模式标志 2";
+"Second iPadOS mode capability flag. Part of the 5-flag iPadOS mode set." = "第二个 iPadOS 模式能力标志。属于五标志 iPadOS 模式集合。";
+"iPadOS Mode Flag 3" = "iPadOS 模式标志 3";
+"Third iPadOS mode capability flag." = "第三个 iPadOS 模式能力标志。";
+"iPadOS Mode Flag 4" = "iPadOS 模式标志 4";
+"Fourth iPadOS mode capability flag." = "第四个 iPadOS 模式能力标志。";
+"iPadOS Mode Flag 5" = "iPadOS 模式标志 5";
+"Fifth iPadOS mode capability flag." = "第五个 iPadOS 模式能力标志。";
+
+/* Internal */
+"Apple Internal Install" = "Apple 内部安装";
+"Enables internal capabilities such as Metal HUD. Some system services may misbehave. High risk." = "开放 Metal HUD 等内部能力。部分系统服务可能异常。高风险。";
+"Internal Storage View" = "内部存储视图";
+"Shows internal files in Storage settings. High risk on some iPads." = "在储存空间设置中显示内部文件。部分 iPad 风险较高。";
+"Security Research Device Mode" = "安全研究设备模式";
+"Marks the device as a Security Research Device. High risk." = "将设备标记为安全研究设备。高风险。";
+
+/* AI Region */
+"Siri AI Region Enabled" = "Siri AI 地区已启用";
+"Master flag for Siri AI (US Region). Set to 1 to enable, 0 to disable. Requires device spoofing on unsupported devices." = "Siri AI（美国地区）主开关。设为 1 启用，0 禁用。不受支持的设备需要设备伪装。";
+"Spoofed Product Type" = "伪装产品型号";
+"Product type used for AI Region spoofing (e.g. 'iPhone16,1'). Empty string = no spoofing." = "用于 AI 地区伪装的产品型号（如 'iPhone16,1'）。空字符串 = 不伪装。";
+"Spoofed Hardware Model" = "伪装硬件型号";
+"Hardware model for AI Region spoofing (e.g. 'D83AP'). Empty string = no spoofing." = "用于 AI 地区伪装的硬件型号（如 'D83AP'）。空字符串 = 不伪装。";
+"Spoofed CPU Model" = "伪装 CPU 型号";
+"CPU model for AI Region spoofing (e.g. 't8130'). Empty string = no spoofing." = "用于 AI 地区伪装的 CPU 型号（如 't8130'）。空字符串 = 不伪装。";
+"Region Code" = "地区代码";
+"Region code for AI Region (e.g. 'LL' = US). Empty string = default." = "AI 地区的地区代码（如 'LL' = 美国）。空字符串 = 默认。";
+"Regulatory Code" = "监管代码";
+"Regulatory certification code for AI Region (e.g. 'LL/A' = US/FCC). Empty string = default." = "AI 地区的监管认证代码（如 'LL/A' = 美国/FCC）。空字符串 = 默认。";
+"Regulatory Model Number" = "监管型号编号";
+"Regulatory model number for AI Region (e.g. 'A2848' = iPhone 15 Pro US). Empty string = default." = "AI 地区的监管型号编号（如 'A2848' = iPhone 15 Pro 美版）。空字符串 = 默认。";
+
+/* 高风险调整项确认 */
+"Enable High-Risk Tweak?" = "启用高风险调整项？";
+"Enable" = "启用";
+"This modification may be irreversible. A backup will be created automatically when you apply, but some changes (e.g. CacheData patches) cannot be reverted even with Factory Reset. Proceed only if you understand the risks." = "此修改可能不可逆。应用时会自动创建备份，但部分修改（如 CacheData 补丁）即使恢复出厂设置也无法回退。仅在确认了解风险后继续。";
+
+/* P1-1: 首次启动引导 */
+"Welcome" = "欢迎";
+"Next" = "下一步";
+"Back" = "上一步";
+"I Understand & Continue" = "我已了解并继续";
+"GestaltKitTool" = "GestaltKitTool";
+"A utility for browsing and modifying the MobileGestalt plist on supported iOS versions." = "用于浏览和修改受支持 iOS 版本上 MobileGestalt plist 的工具。";
+"Toggle system features and flags" = "切换系统功能和标志";
+"Browse the sandbox file system" = "浏览沙盒文件系统";
+"Create and restore backups" = "创建和恢复备份";
+"Apply shared tweak profiles" = "应用共享调整配置";
+"Risk Declaration" = "风险声明";
+"This tool modifies system-level plist files that are normally read-only. Incorrect changes may cause system instability." = "本工具修改的系统级 plist 文件通常为只读。错误的修改可能导致系统不稳定。";
+"A backup is created automatically before each write. You can also create manual backups from the Backups screen." = "每次写入前会自动创建备份。您也可以从备份页面手动创建备份。";
+"Changes are applied immediately. After writing, the device will respring (restart SpringBoard) for changes to take effect." = "更改将立即应用。写入后，设备将注销（重启 SpringBoard）以使更改生效。";
+"Some changes (e.g. enabling iPadOS mode) are difficult to reverse and may require restoring from a backup." = "某些更改（如启用 iPadOS 模式）难以逆转，可能需要从备份恢复。";
+"This tool works via a sandbox escape (bad_query). It does not require a jailbreak, but it relies on specific iOS build vulnerabilities that may be patched in future updates." = "本工具通过沙盒逃逸（bad_query）工作。不需要越狱，但依赖特定 iOS 内部版本漏洞，未来更新可能会修补。";
+"Before You Begin" = "开始之前";
+"I understand that I should create a backup before making changes, and that automatic backups are created before each write." = "我了解在做出更改之前应创建备份，并且每次写入前会自动创建备份。";
+"I understand that applying changes will respring my device, causing all apps to close temporarily." = "我了解应用更改会使设备注销，导致所有应用暂时关闭。";
+"I understand that some changes may be difficult to reverse, and I accept the risks of using this tool." = "我了解某些更改可能难以逆转，我接受使用此工具的风险。";
+"You can revisit this information anytime from Settings → About." = "您可以随时从设置 → 关于重新查看此信息。";
+
+/* P1-2: 应用前确认 */
+"Apply Changes?" = "应用更改？";
+"Apply & Respring" = "应用并注销";
+"%d changes will be written to the MobileGestalt plist. An automatic backup will be created. After writing, your device will respring — all apps will close temporarily." = "将向 MobileGestalt plist 写入 %d 项更改。将自动创建备份。写入后，设备将注销——所有应用将暂时关闭。";
+
+/* P1-3: 应用 diff 预览 */
+"Pending Changes" = "待应用的更改";
+"No changes pending." = "没有待应用的更改。";
+"An automatic backup will be created before writing. After writing, your device will respring." = "写入前将自动创建备份。写入后，设备将注销。";
+"Review Changes" = "查看更改";
+"Continue" = "继续";
+"Tweak" = "调整项";
+"Subtype" = "子类型";
+"Model Name" = "型号名称";
+"Enabled" = "已启用";
+"Default" = "默认";
+
+/* P1-4: 诊断快捷入口 */
+"Diagnostics…" = "诊断…";
+"Done" = "完成";
+
+/* P1-5: Respring 超时 */
+"Respring Timed Out" = "注销超时";
+"The automatic respring did not complete. Please manually restart your device (power off and back on) for changes to take effect." = "自动注销未完成。请手动重启设备（关机后再开机）以使更改生效。";
+
+/* P1-6: 跨设备备份警告 */
+"⚠️ This backup was created on a different device model (%@). Your current device is %@. Restoring may overwrite device identity and cause unpredictable behavior. The current file will be backed up first." = "⚠️ 此备份创建于不同型号的设备（%@）。您当前的设备是 %@。恢复可能覆盖设备标识并导致不可预测的行为。当前文件将先进行备份。";
+
+/* P2-1: 系统工具分区 */
+"System Tools" = "系统工具";
+"System Inspector reads sensitive system files. App Backups stores full data container copies. Safe Cleanup clears caches and tmp directories." = "系统检查器读取敏感系统文件。应用备份存储完整数据容器副本。安全清理清除缓存和临时目录。";
+
+/* P2-2: 预设去重 */
+"Manage All Presets…" = "管理所有预设…";
+
+/* P2-3: 统一空状态标题 */
+"No Presets" = "暂无预设";
+"Configure tweaks above, then save a preset for quick reuse." = "在上方配置调整项，然后保存预设以便快速复用。";
+"No Saved Presets" = "暂无已保存的预设";
+"Pick tweaks on the Tweak tab, then type a name above and tap Save." = "在调整页选择调整项，然后输入名称并点击保存。";
+
+/* P2-4: 不可逆调整项警告 */
+"⚠️ IRREVERSIBLE: This tweak modifies CacheData bytes that cannot be reverted even by Factory Reset or disabling the tweak. The only way to undo this change is to restore from a backup taken before it was applied." = "⚠️ 不可逆：此调整项修改 CacheData 字节，即使恢复出厂设置或禁用此调整项也无法还原。撤销此更改的唯一方法是恢复在此更改应用之前创建的备份。";
+
+/* P2-5: 预设加载预览 */
+"Preset" = "预设";
+"Name" = "名称";
+"Tweaks" = "调整项";
+"Changes" = "变更";
+"No changes — this preset matches your current configuration." = "无变更——此预设与您当前的配置一致。";
+"Loading this preset will replace your current tweak selections. Your MobileGestalt plist is not modified until you tap Apply." = "加载此预设将替换当前的调整项选择。您的 MobileGestalt plist 在点击应用之前不会被修改。";
+"Load Preset" = "加载预设";
+"Load" = "加载";
+"Dynamic Island Subtype" = "灵动岛子类型";
+"AI Region" = "AI 区域";
+
+/* P2-6: 关于 / 常见问题 */
+"App Name" = "应用名称";
+"Supported iOS" = "支持的 iOS";
+"View Risk Declaration" = "查看风险声明";
+"About" = "关于";
+"GestaltKitTool modifies system-level plist files via a sandbox escape. Always create a backup before applying changes." = "GestaltKitTool 通过沙盒逃逸修改系统级 plist 文件。应用更改前请务必创建备份。";
+"FAQ" = "常见问题";
+"What is MobileGestalt?" = "什么是 MobileGestalt？";
+"MobileGestalt is a system framework that stores device capability information in a plist file. Apps and services read this file to determine what features your device supports." = "MobileGestalt 是一个系统框架，将设备功能信息存储在 plist 文件中。应用和服务读取此文件来确定您的设备支持哪些功能。";
+"What is a respring?" = "什么是注销？";
+"A respring restarts SpringBoard (the iOS home screen) without rebooting the entire device. It takes a few seconds and all apps will close temporarily." = "注销会重启 SpringBoard（iOS 主屏幕）而不会重启整个设备。只需几秒钟，所有应用将暂时关闭。";
+"How do I undo changes?" = "如何撤销更改？";
+"Go to Tools → Backups, select a backup from before your changes, and tap Restore. You can also use 'Undo Last Write' in the Danger Zone section." = "前往工具 → 备份，选择更改前的备份，然后点击恢复。您也可以使用危险区域中的「撤销上次写入」。";
+"Why did my tweak revert after restart?" = "为什么我的调整项在重启后恢复了？";
+"Some CacheExtra keys are regenerated by system daemons after reboot. This is expected behavior for certain keys. Re-apply your tweaks after restart if needed." = "某些 CacheExtra 键在重启后会被系统守护进程重新生成。这是某些键的预期行为。如有需要，请在重启后重新应用调整项。";
+
+/* P2-7: 缺失键审计 */
+"On" = "开";
+"Off" = "关";
+"Refresh" = "刷新";
+"Toggle Bookmark" = "切换书签";
+"Unable to parse JSON." = "无法解析 JSON。";
+
+
+"File too large to export (>256 MB)" = "文件过大，无法导出（>256 MB）";
+"Failed to load patches. A corrupt patch file may have been removed or moved." = "加载补丁失败。可能存在损坏的补丁文件已被移除或移动。";
+
+/* Diagnostics — iOS 26.0.x enhancements */
+"Probe Flags (Find RW)" = "探测标志位（查找读写权限）";
+"Run All tests bad_query availability, sandbox lease, container discovery, and file read operations. Probe Flags enumerates flag combinations to find one that grants read-write access (diagnostic only, results in Console.app filter [GKTL-ObjC])." = "全部运行测试 bad_query 可用性、沙盒租约、容器发现和文件读取操作。探测标志位枚举标志组合，查找可授予读写权限的标志（仅供诊断，结果在 Console.app 筛选 [GKTL-ObjC]）。";
+"Flag probe complete. Check Console.app (filter [GKTL-ObjC]) for results.\nLook for lines with canWrite=1 — that flag value grants read-write access." = "标志位探测完成。请在 Console.app 中查看结果（筛选 [GKTL-ObjC]）。\n查找 canWrite=1 的行——该标志值授予读写权限。";
+"Lease acquired for file:\n%@" = "已获取文件租约：\n%@";
+"Failed to acquire lease: %@" = "获取租约失败：%@";
+"unknown error" = "未知错误";
+"[ iOS 26.0.x detected (build %@) ] bad_query's ContainerManager query was accepted but the kernel refused to issue a sandbox extension. This is a known symptom on early iOS 26.0 builds where the sandbox policy differs from iOS 27. Possible causes:\n  1. The MobileGestalt cache plist has not been generated yet — try respringing once, then rerun diagnostics.\n  2. The bad_query exploit parameters (class=13, part=3, flags=0x8000000000) may need adjustment for this specific build.\n  3. Apple may have partially patched bad_query in this build.\n\nCheck the device console (Console.app, filter [GKTL-ObjC]) for detailed per-stage logs showing exactly where the lease acquisition failed (lstat / create / getSingleResult / copySandboxToken / consume)." = "[ 检测到 iOS 26.0.x（版本号 %@）] bad_query 的 ContainerManager 查询已被接受，但内核拒绝签发沙盒扩展。这是 iOS 26.0 早期版本的已知问题，其沙盒策略与 iOS 27 不同。可能原因：\n  1. MobileGestalt 缓存 plist 尚未生成——请尝试注销一次，然后重新运行诊断。\n  2. bad_query 利用参数（class=13, part=3, flags=0x8000000000）可能需要针对此版本进行调整。\n  3. Apple 可能已在此版本中部分修补了 bad_query。\n\n请查看设备控制台（Console.app，筛选 [GKTL-ObjC]）获取详细的分阶段日志，查看租约获取具体在哪一步失败（lstat / create / getSingleResult / copySandboxToken / consume）。";
+"Diagnostics complete." = "诊断完成。";
+
+/* GestaltAccess — read-only mode */
+"The sandbox extension acquired by bad_query only grants READ access on this iOS build. MobileGestalt values can be viewed but cannot be modified. This is a known limitation of iOS 26.0.x where the group-sacrifice flags (0x0800000000) do not convey write permissions." = "bad_query 获取的沙盒扩展在此 iOS 版本上仅授予读取权限。可以查看 MobileGestalt 值但无法修改。这是 iOS 26.0.x 的已知限制，其组牺牲标志位（0x0800000000）不传达写入权限。";
+"bad_query acquired a sandbox extension, but the MobileGestalt plist is neither readable nor writable." = "bad_query 已获取沙盒扩展，但 MobileGestalt plist 既不可读也不可写。";

@@ -2,12 +2,9 @@
 //  ArchiveManager.swift
 //  GestaltKitTool
 //
-//  Copy-style archive (not move/delete, since bad_query is read-only).
-//  Inspired by FilzaSlop 1.0.3's Archive feature — but GestaltKitTool's
-//  underlying bad_query sandbox escape provides READ-ONLY access, so we
-//  cannot truly "move" source files (no write/delete lease on the origin
-//  container). We instead copy a snapshot to the app's own Documents
-//  folder, which is always writable.
+//  Copy-style archive. bad_query provides read-only access, so we copy
+//  snapshots to the app's Documents folder rather than moving source files.
+//
 //
 //  "Restore" means copy the archive snapshot back to the Export temp
 //  directory so it can be shared. True restore-to-original-location is
@@ -15,6 +12,7 @@
 //
 
 import Foundation
+import os
 
 enum ArchiveError: LocalizedError {
     case noSuchFile(String)
@@ -28,19 +26,19 @@ enum ArchiveError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noSuchFile(let p):
-            return "Source file not found: \(p)"
+            return String(format: String(localized: "Source file not found: %@"), p)
         case .readFailed(let p, let e):
-            return "Failed to read \(p): \(e.localizedDescription)"
+            return String(format: String(localized: "Failed to read %@: %@"), p, e.localizedDescription)
         case .writeFailed(let p, let e):
-            return "Failed to write \(p): \(e.localizedDescription)"
+            return String(format: String(localized: "Failed to write %@: %@"), p, e.localizedDescription)
         case .directoryEnumerationFailed(let p):
-            return "Failed to enumerate directory: \(p)"
+            return String(format: String(localized: "Failed to enumerate directory: %@"), p)
         case .sourceIsDirectoryButCouldNotList(let p):
-            return "Source is a directory but contents could not be listed: \(p)"
+            return String(format: String(localized: "Source is a directory but contents could not be listed: %@"), p)
         case .nameCollision(let p):
-            return "An item with this name already exists in the archive: \(p). Delete or rename the existing archive entry first."
+            return String(format: String(localized: "An item with this name already exists in the archive: %@. Delete or rename the existing archive entry first."), p)
         case .cancel:
-            return "Cancelled"
+            return String(localized: "Cancelled")
         }
     }
 }
@@ -267,7 +265,8 @@ enum ArchiveManager {
         let safe = sanitizeName(name)
         let sourceURL = archiveRoot.appendingPathComponent(safe)
         let fm = FileManager.default
-        guard fm.fileExists(atPath: sourceURL.sourceURL_fm_pathFix) else {
+        let sourcePath = sourceURL.path
+        guard fm.fileExists(atPath: sourcePath) else {
             throw ArchiveError.noSuchFile(sourceURL.path)
         }
         let exportDir = ExportFileManager.exportDir
@@ -280,9 +279,22 @@ enum ArchiveManager {
     // MARK: - Private
 
     private static func sanitizeName(_ name: String) -> String {
-        name
+        // - Strip NUL and backslash (Windows path separator tricks)
+        // - Replace "/" and ".." path components
+        // - Trim leading dots / slashes / whitespace
+        // - Fall back to "unnamed" if nothing remains.
+        var cleaned = name
+            .replacingOccurrences(of: "\0", with: "")
+            .replacingOccurrences(of: "\\", with: "_")
             .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "..", with: "_")
+        // Collapse ".." segments (path traversal) — handle adjacent slashes
+        // already replaced above so just replace remaining "..".
+        while cleaned.contains("..") {
+            cleaned = cleaned.replacingOccurrences(of: "..", with: "_")
+        }
+        // Trim leading "." and whitespace that could yield hidden or empty names.
+        cleaned = cleaned.trimmingCharacters(in: CharacterSet(charactersIn: ". \t\n\r"))
+        return cleaned.isEmpty ? "unnamed" : cleaned
     }
 
     private static func copySingleFile(
@@ -315,8 +327,13 @@ enum ArchiveManager {
         totalBytes: inout Int64,
         totalEstimate: Int64,
         onByteCopied: ((Int64, Int64) -> Void)?,
-        cancelled: () -> Bool
+        cancelled: () -> Bool,
+        currentDepth: Int = 0,
+        maxDepth: Int = 32
     ) throws {
+        guard currentDepth < maxDepth else {
+            throw ArchiveError.sourceIsDirectoryButCouldNotList(fromPath)
+        }
         var nsError: NSError?
         let children = fileAccess.listDirectory(atPath: fromPath, error: &nsError)
         if nsError != nil {
@@ -343,7 +360,9 @@ enum ArchiveManager {
                     totalBytes: &totalBytes,
                     totalEstimate: totalEstimate,
                     onByteCopied: onByteCopied,
-                    cancelled: cancelled
+                    cancelled: cancelled,
+                    currentDepth: currentDepth + 1,
+                    maxDepth: maxDepth
                 )
             } else {
                 try copySingleFile(
@@ -370,8 +389,12 @@ enum ArchiveManager {
 
     private static func writeMetadata(_ meta: ArchivedItemMetadata, for archivedURL: URL) {
         let url = metadataURL(for: archivedURL)
-        if let data = try? JSONEncoder().encode(meta) {
-            try? data.write(to: url, options: .atomic)
+        do {
+            let data = try JSONEncoder().encode(meta)
+            try data.write(to: url, options: .atomic)
+        } catch {
+            // Non-fatal: archive succeeded, but missing metadata means restore lacks source info.
+            GKTLLog.browse.error("writeMetadata failed: \(error.localizedDescription)")
         }
     }
 
@@ -382,10 +405,4 @@ enum ArchiveManager {
         else { return nil }
         return meta
     }
-}
-
-// Helper added to avoid a naming collision with the stdlib `URL.path`
-// inside an expression chain where the compiler got confused.
-private extension URL {
-    var sourceURL_fm_pathFix: String { path }
 }

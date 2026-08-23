@@ -11,28 +11,13 @@
 "Support SUSS" = "Support SUSS";
 "Fields" = "Fields";
 "Backups" = "Backups";
-"Restore" = "Restore";
-"OK" = "OK";
-"Enable Siri AI (US Region)" = "Enable Siri AI (US Region)";
 "Unsupported device: force enable with device identity spoofing. Face ID or system stability may be affected." = "Unsupported device: force enable with device identity spoofing. Face ID or system stability may be affected.";
 "This device does not officially support Siri AI. Force enabling spoofs the product, hardware, and CPU model. It may temporarily break Face ID, cause system instability or boot loops, and could require restoring the device. A backup will be created before writing." = "This device does not officially support Siri AI. Force enabling spoofs the product, hardware, and CPU model. It may temporarily break Face ID, cause system instability or boot loops, and could require restoring the device. A backup will be created before writing.";
 "Reading MobileGestalt…" = "Reading MobileGestalt…";
 "Unable to read MobileGestalt" = "Unable to read MobileGestalt";
-"Unsupported iOS Version" = "Unsupported iOS Version";
-"GestaltKitTool currently supports only iOS 27 beta 1 through beta 4." = "GestaltKitTool currently supports only iOS 27 beta 1 through beta 4.";
 "Reload" = "Reload";
-"Connected" = "Connected";
 "Current Device" = "Current Device";
-"Device Subtype" = "Device Subtype";
-"No Change" = "No Change";
-"Dynamic Island" = "Dynamic Island";
-"Selecting a subtype writes ArtworkDeviceSubType and the Dynamic Island support flag." = "Selecting a subtype writes ArtworkDeviceSubType and the Dynamic Island support flag.";
-"Device Name" = "Device Name";
-"Change model name in About" = "Change model name in About";
-"Model Name" = "Model Name";
 "%d pending changes" = "%d pending changes";
-"Automatic backup before writing" = "Automatic backup before writing";
-"Apply" = "Apply";
 "High Risk" = "High Risk";
 
 "Back Up Current MobileGestalt" = "Back Up Current MobileGestalt";
@@ -40,10 +25,7 @@
 "Importing only adds a file to the backup library. It does not write immediately. The original plist is also backed up before every write." = "Importing only adds a file to the backup library. It does not write immediately. The original plist is also backed up before every write.";
 "Local Backups" = "Local Backups";
 "No Backups" = "No Backups";
-"Restore This MobileGestalt Backup?" = "Restore This MobileGestalt Backup?";
-"Restore and Write" = "Restore and Write";
-"Cancel" = "Cancel";
-"The current file will be backed up first. SpringBoard will refresh automatically after restoring." = "The current file will be backed up first. SpringBoard will refresh automatically after restoring.";
+"Create a backup before making changes so you can roll back at any time." = "Create a backup before making changes so you can roll back at any time.";
 "Export Backup" = "Export Backup";
 "Restore Backup" = "Restore Backup";
 
@@ -51,7 +33,7 @@
 "Full plist snapshot" = "Full plist snapshot";
 "Field-level patches" = "Field-level patches";
 "A backup is a full snapshot of this device's MobileGestalt plist, including device-identity fields. Use it to roll back before risky changes. Do not share across devices — restoring it on another device would overwrite its identity." = "A backup is a full snapshot of this device's MobileGestalt plist, including device-identity fields. Use it to roll back before risky changes. Do not share across devices — restoring it on another device would overwrite its identity.";
-"A patch is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "A patch is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations.";
+"A patch is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "A patch is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — used to share tweak combinations.";
 
 "Search key or value" = "Search key or value";
 "Add CacheExtra Field" = "Add CacheExtra Field";
@@ -63,9 +45,7 @@
 "Type" = "Type";
 "Value" = "Value";
 "Delete Field" = "Delete Field";
-"Done" = "Done";
 "Delete CacheExtra Field?" = "Delete CacheExtra Field?";
-"Delete" = "Delete";
 "The field will be removed from the file after you return to the editor and tap Save." = "The field will be removed from the file after you return to the editor and tap Save.";
 "Field" = "Field";
 "Location" = "Location";
@@ -96,10 +76,9 @@
 "Region" = "Region";
 "Internal & Research" = "Internal & Research";
 "Enable Dynamic Island Capability" = "Enable Dynamic Island Capability";
-"Nugget's alternate enable method." = "Nugget's alternate enable method.";
+"Alternate enable method." = "Alternate enable method.";
 "Always-On Display" = "Always-On Display";
 "May increase burn-in risk on unsupported devices." = "May increase burn-in risk on unsupported devices.";
-"AOD Vibrancy" = "AOD Vibrancy";
 "Use this when AOD rendering looks incorrect." = "Use this when AOD rendering looks incorrect.";
 "Disable Wallpaper Parallax" = "Disable Wallpaper Parallax";
 "Stops wallpaper motion based on device movement." = "Stops wallpaper motion based on device movement.";
@@ -107,31 +86,20 @@
 "For iOS 26 and later." = "For iOS 26 and later.";
 "Disable Liquid Glass Low-Performance Mode" = "Disable Liquid Glass Low-Performance Mode";
 "Mutually exclusive with the option above." = "Mutually exclusive with the option above.";
-"Boot & Shutdown Chime" = "Boot & Shutdown Chime";
 "Enables the device boot and shutdown chime capability." = "Enables the device boot and shutdown chime capability.";
-"Charge Limit Menu" = "Charge Limit Menu";
 "Shows the Settings menu; actual limiting depends on hardware." = "Shows the Settings menu; actual limiting depends on hardware.";
-"Tap to Wake" = "Tap to Wake";
 "Primarily for models such as iPhone SE where it is unavailable." = "Primarily for models such as iPhone SE where it is unavailable.";
 "iPhone 16 Camera Control Settings" = "iPhone 16 Camera Control Settings";
 "Shows Camera Control settings and related capabilities." = "Shows Camera Control settings and related capabilities.";
-"Apple Pencil Settings" = "Apple Pencil Settings";
 "Shows the Apple Pencil settings page." = "Shows the Apple Pencil settings page.";
-"Action Button Settings" = "Action Button Settings";
 "Shows the Action Button settings page." = "Shows the Action Button settings page.";
-"Collision SOS" = "Collision SOS";
 "Shows collision detection in SOS settings." = "Shows collision detection in SOS settings.";
-"Stage Manager Support" = "Stage Manager Support";
 "Marks the device as supporting Stage Manager." = "Marks the device as supporting Stage Manager.";
-"Allow iPad Apps" = "Allow iPad Apps";
 "Enables iPad app compatibility types on iPhone." = "Enables iPad app compatibility types on iPhone.";
 "Enable iPadOS Mode" = "Enable iPadOS Mode";
 "Changes five capabilities and CacheData; experimental and high risk." = "Changes five capabilities and CacheData; experimental and high risk.";
-"Apple Internal Install" = "Apple Internal Install";
 "Enables internal capabilities such as Metal HUD; some services may misbehave." = "Enables internal capabilities such as Metal HUD; some services may misbehave.";
-"Internal Storage View" = "Internal Storage View";
 "Shows internal files in Storage settings; high risk on some iPads." = "Shows internal files in Storage settings; high risk on some iPads.";
-"Security Research Device Mode" = "Security Research Device Mode";
 "Marks the device as a Security Research Device." = "Marks the device as a Security Research Device.";
 "iPhone X Gestures (SE)" = "iPhone X Gestures (SE)";
 
@@ -143,11 +111,14 @@
 "The backup is not a valid MobileGestalt plist." = "The backup is not a valid MobileGestalt plist.";
 "The MobileGestalt values after writing do not match the expected values." = "The MobileGestalt values after writing do not match the expected values.";
 "The device model name cannot be empty." = "The device model name cannot be empty.";
+"Model name too long (max %d characters)." = "Model name too long (max %d characters).";
+"Model name contains invalid characters (allowed: letters, numbers, spaces, -.,()'')" = "Model name contains invalid characters (allowed: letters, numbers, spaces, -.,()')";
+"%d/%d characters" = "%d/%d characters";
 
 "MobileGestalt is missing the ArtworkDevice dictionary, so Dynamic Island or model name cannot be changed." = "MobileGestalt is missing the ArtworkDevice dictionary, so Dynamic Island or model name cannot be changed.";
 "MobileGestalt is missing CacheData, so iPadOS mode cannot be enabled." = "MobileGestalt is missing CacheData, so iPadOS mode cannot be enabled.";
 "CacheData is too short to apply iPadOS mode safely." = "CacheData is too short to apply iPadOS mode safely.";
-"The iPadOS marker required by Nugget was not found in CacheData." = "The iPadOS marker required by Nugget was not found in CacheData.";
+"The required iPadOS marker was not found in CacheData." = "The required iPadOS marker was not found in CacheData.";
 "CacheData marker validation failed. No changes were made." = "CacheData marker validation failed. No changes were made.";
 
 "bad_query is unavailable (required ContainerManager or sandbox extension APIs are missing)." = "bad_query is unavailable (required ContainerManager or sandbox extension APIs are missing).";
@@ -167,21 +138,14 @@
 "Post-write verification failed." = "Post-write verification failed.";
 
 /* Settings */
-"Settings" = "Settings";
 "Language" = "Language";
 "Follow System" = "Follow System";
 "Changes take effect on the next app launch." = "Changes take effect on the next app launch.";
 "Restart the app for the new language to take effect." = "Restart the app for the new language to take effect.";
 
 /* System Info */
-"System Version" = "System Version";
-"Supported" = "Supported";
-"Unsupported" = "Unsupported";
-"Build" = "Build";
-"Unknown" = "Unknown";
 
 /* File Explorer */
-"Explorer" = "Explorer";
 "App Sandboxes" = "App Sandboxes";
 "Each entry is another app's private data container. bad_query bypasses the sandbox to list and read these directories." = "Each entry is another app's private data container. bad_query bypasses the sandbox to list and read these directories.";
 "Scanning app containers…" = "Scanning app containers…";
@@ -200,7 +164,6 @@
 "Size" = "Size";
 "Modified" = "Modified";
 "Extension" = "Extension";
-"About" = "About";
 "Property List" = "Property List";
 "JSON" = "JSON";
 "SQLite Database" = "SQLite Database";
@@ -212,19 +175,18 @@
 "Dynamic Library" = "Dynamic Library";
 "Framework Bundle" = "Framework Bundle";
 "A directory (folder). Tap to navigate into it and view its contents." = "A directory (folder). Tap to navigate into it and view its contents.";
-"An Apple property list file. Contains structured key-value data, typically used for application settings, preferences, and configuration. Can be in binary or XML format." = "An Apple property list file. Contains structured key-value data, typically used for application settings, preferences, and configuration. Can be in binary or XML format.";
-"A JSON (JavaScript Object Notation) data file. Contains structured data in a human-readable text format, commonly used for app data export, API responses, and configuration." = "A JSON (JavaScript Object Notation) data file. Contains structured data in a human-readable text format, commonly used for app data export, API responses, and configuration.";
-"An SQLite database file. Contains structured data in tables, indexes, and schemas. May store app data, caches, or metadata. Binary format — view in hex mode for raw inspection." = "An SQLite database file. Contains structured data in tables, indexes, and schemas. May store app data, caches, or metadata. Binary format — view in hex mode for raw inspection.";
-"A plain text file. Contains unformatted text data, readable directly. May include logs, notes, or configuration data." = "A plain text file. Contains unformatted text data, readable directly. May include logs, notes, or configuration data.";
-"A log file. Contains timestamped application or system events, useful for debugging and diagnostics. Plain text format." = "A log file. Contains timestamped application or system events, useful for debugging and diagnostics. Plain text format.";
-"An image file. Contains raster graphics data. Can be previewed directly in the file viewer. Common formats include PNG, JPEG, and HEIC (Apple's high-efficiency format)." = "An image file. Contains raster graphics data. Can be previewed directly in the file viewer. Common formats include PNG, JPEG, and HEIC (Apple's high-efficiency format).";
-"An XML (eXtensible Markup Language) file. Contains structured text data with tags, used for configuration, data interchange, and property lists in text format." = "An XML (eXtensible Markup Language) file. Contains structured text data with tags, used for configuration, data interchange, and property lists in text format.";
-"A dynamic library (shared object). Contains compiled machine code loaded at runtime. Binary format — view in hex mode for raw inspection." = "A dynamic library (shared object). Contains compiled machine code loaded at runtime. Binary format — view in hex mode for raw inspection.";
-"A framework bundle directory. Contains a dynamic library and associated resources (headers, plists). Tap to browse its contents." = "A framework bundle directory. Contains a dynamic library and associated resources (headers, plists). Tap to browse its contents.";
-"A file in the device filesystem. Tap to preview its contents. The file type is not specifically recognized — it may be shown as text or binary data." = "A file in the device filesystem. Tap to preview its contents. The file type is not specifically recognized — it may be shown as text or binary data.";
+"An Apple property list file. Contains structured key-value data, typically used for application settings, preferences, and configuration. Can be in binary or XML format." = "Apple property list file. Binary or XML format. Stores settings, preferences, configuration as key-value data.";
+"A JSON (JavaScript Object Notation) data file. Contains structured data in a human-readable text format, commonly used for app data export, API responses, and configuration." = "JSON file. Plain text. Used for export, API responses, configuration.";
+"An SQLite database file. Contains structured data in tables, indexes, and schemas. May store app data, caches, or metadata. Binary format — view in hex mode for raw inspection." = "SQLite database. Tables, indexes, schemas. Binary — hex mode available for raw view.";
+"A plain text file. Contains unformatted text data, readable directly. May include logs, notes, or configuration data." = "Plain text file. Unformatted text, readable directly.";
+"A log file. Contains timestamped application or system events, useful for debugging and diagnostics. Plain text format." = "Log file. Timestamped events. Plain text.";
+"An image file. Contains raster graphics data. Can be previewed directly in the file viewer. Common formats include PNG, JPEG, and HEIC (Apple's high-efficiency format)." = "Image file. PNG / JPEG / HEIC. Preview supported.";
+"An XML (eXtensible Markup Language) file. Contains structured text data with tags, used for configuration, data interchange, and property lists in text format." = "XML file. Tagged text format. Used for configuration, interchange, text plists.";
+"A dynamic library (shared object). Contains compiled machine code loaded at runtime. Binary format — view in hex mode for raw inspection." = "Dynamic library (shared object). Compiled machine code, loaded at runtime. Binary — hex mode available.";
+"A framework bundle directory. Contains a dynamic library and associated resources (headers, plists). Tap to browse its contents." = "Framework bundle. Dynamic library + resources (headers, plists). Tap to browse.";
+"A file in the device filesystem. Tap to preview its contents. The file type is not specifically recognized — it may be shown as text or binary data." = "Unknown file type. Tap to preview — shown as text or binary.";
 
 /* System Inspector */
-"Inspector" = "Inspector";
 "These files contain sensitive system data. Reading them demonstrates the full impact of bad_query sandbox escape." = "These files contain sensitive system data. Reading them demonstrates the full impact of bad_query sandbox escape.";
 "Identity & Gestalt" = "Identity & Gestalt";
 "System Containers" = "System Containers";
@@ -233,7 +195,6 @@
 "System Groups" = "System Groups";
 "MobileGestalt Cache" = "MobileGestalt Cache";
 "App Data" = "App Data";
-"App Groups" = "App Groups";
 "Internal Daemon" = "Internal Daemon";
 "PluginKit Plugins" = "PluginKit Plugins";
 "Network Configuration" = "Network Configuration";
@@ -306,7 +267,6 @@
 "No matching files." = "No matching files.";
 "Search Results" = "Search Results";
 "Matches" = "Matches";
-"No matching files found." = "No matching files found.";
 
 /* Error messages */
 "Error" = "Error";
@@ -333,10 +293,6 @@
 
 /* Factory reset */
 "Restore Factory Settings" = "Restore Factory Settings";
-"Restore Factory Settings?" = "Restore Factory Settings?";
-"Restore Factory" = "Restore Factory";
-"All tweaks will be disabled and written to the plist. A backup of the current state is created automatically. This does not revert iPadOS CacheData patches — use backup restore for that." = "All tweaks will be disabled and written to the plist. A backup of the current state is created automatically. This does not revert iPadOS CacheData patches — use backup restore for that.";
-"Restore Factory Settings disables all tweaks by writing default values. A backup is created automatically before writing. iPadOS CacheData patches are not reversible — use backup restore for that." = "Restore Factory Settings disables all tweaks by writing default values. A backup is created automatically before writing. iPadOS CacheData patches are not reversible — use backup restore for that.";
 
 /* Optimization: file size guard, path validation, batch delete */
 "File is too large to preview (%.1f MB). Limit is %.0f MB." = "File is too large to preview (%.1f MB). Limit is %.0f MB.";
@@ -344,7 +300,6 @@
 "Path contains invalid characters" = "Path contains invalid characters";
 "Path contains control characters" = "Path contains control characters";
 "Delete %d" = "Delete %d";
-"Delete %d backups?" = "Delete %d backups?";
 "This action cannot be undone." = "This action cannot be undone.";
 "GIF Image" = "GIF Image";
 "Image" = "Image";
@@ -364,7 +319,6 @@
 "Any Type" = "Any Type";
 "Plist" = "Plist";
 "Database" = "Database";
-"Archive" = "Archive";
 "Binary" = "Binary";
 
 /* ——— Search progress & counters ——— */
@@ -409,7 +363,7 @@
 "App container root" = "App container root";
 "Top-level container for a single app's sandbox. Files you see here are the ones created by the app: Documents, Library, tmp. Empty subdirectories mean the app hasn't exercised that code path yet." = "Top-level container for a single app's sandbox. Files you see here are the ones created by the app: Documents, Library, tmp. Empty subdirectories mean the app hasn't exercised that code path yet.";
 
-/* ── MobileGestalt tab: top device info grid & tab bar ────────────── */
+/*  MobileGestalt tab: top device info grid & tab bar  */
 "Explorer" = "Explorer";
 "Inspector" = "Inspector";
 "Settings" = "Settings";
@@ -423,53 +377,51 @@
 "Connected" = "Connected";
 "No Change" = "No Change";
 
-/* ── Dynamic Island & Device Name sections ──────────────────────── */
+/*  Dynamic Island & Device Name sections  */
 "Device Name" = "Device Name";
 "Change model name in About" = "Change model name in About";
-"Model Name" = "Model Name";
 "Device Subtype" = "Device Subtype";
 "Dynamic Island" = "Dynamic Island";
 "Selecting a subtype writes ArtworkDeviceSubType and the Dynamic Island support flag." = "Selecting a subtype writes ArtworkDeviceSubType and the Dynamic Island support flag.";
 
-/* ── Apply bar ─────────────────────────────────────────────────── */
+/*  Apply bar  */
 "Apply" = "Apply";
 "Automatic backup before writing" = "Automatic backup before writing";
+"Working…" = "Working…";
 "OK" = "OK";
-"Cancel" = "Cancel";
 
-/* ── Factory Reset flow ────────────────────────────────────────── */
+/*  Factory Reset flow  */
 "Restore Factory Settings?" = "Restore Factory Settings?";
 "Restore Factory" = "Restore Factory";
 "All tweaks will be disabled and written to the plist. A backup of the current state is created automatically. This does not revert iPadOS CacheData patches — use backup restore for that." = "All tweaks will be disabled and written to the plist. A backup of the current state is created automatically. This does not revert iPadOS CacheData patches — use backup restore for that.";
 "Restore Factory Settings disables all tweaks by writing default values. A backup is created automatically before writing. iPadOS CacheData patches are not reversible — use backup restore for that." = "Restore Factory Settings disables all tweaks by writing default values. A backup is created automatically before writing. iPadOS CacheData patches are not reversible — use backup restore for that.";
 
-/* ── Unsupported OS screen ─────────────────────────────────────── */
+/*  Unsupported OS screen  */
 "Unsupported iOS Version" = "Unsupported iOS Version";
 "GestaltKitTool currently supports only iOS 27 beta 1 through beta 4." = "GestaltKitTool currently supports only iOS 27 beta 1 through beta 4.";
 
-/* ── Siri AI toggle ────────────────────────────────────────────── */
+/*  Siri AI toggle  */
 "Enable Siri AI (US Region)" = "Enable Siri AI (US Region)";
 
-/* ── Backup Library flows ──────────────────────────────────────── */
+/*  Backup Library flows  */
 "Restore This MobileGestalt Backup?" = "Restore This MobileGestalt Backup?";
 "Restore and Write" = "Restore and Write";
 "The current file will be backed up first. SpringBoard will refresh automatically after restoring." = "The current file will be backed up first. SpringBoard will refresh automatically after restoring.";
 "Delete %d backups?" = "Delete %d backups?";
-"Delete" = "Delete";
 "Restore" = "Restore";
 
-/* ── Patch Exporter flows ──────────────────────────────────────── */
+/*  Patch Exporter flows  */
 "Search keys…" = "Search keys…";
 "Export Patch" = "Export Patch";
 "Name Required" = "Name Required";
 "Please give this patch a name before exporting." = "Please give this patch a name before exporting.";
 
-/* ── Patch Library flows ───────────────────────────────────────── */
+/*  Patch Library flows  */
 "Apply This Patch?" = "Apply This Patch?";
 "Apply and Write" = "Apply and Write";
 "The patch's CacheExtra fields will be merged onto the current plist. A backup is created automatically before writing. SpringBoard will refresh after writing." = "The patch's CacheExtra fields will be merged onto the current plist. A backup is created automatically before writing. SpringBoard will refresh after writing.";
 
-/* ── Archive (CR-30 copy-style archive, bad_query is read-only) ───── */
+/*  Archive (copy-style archive, bad_query is read-only)  */
 "Local Storage" = "Local Storage";
 "GestaltKitTool's copy-style archive. Snapshots of files/directories read via bad_query are stored here (Documents/GestaltKitTool Archive). Source files are NOT moved or deleted — bad_query provides read-only access, so Archive copies instead of moving." = "GestaltKitTool's copy-style archive. Snapshots of files/directories read via bad_query are stored here (Documents/GestaltKitTool Archive). Source files are NOT moved or deleted — bad_query provides read-only access, so Archive copies instead of moving.";
 "Copy to Archive" = "Copy to Archive";
@@ -483,3 +435,433 @@
 "Delete" = "Delete";
 "Cancel" = "Cancel";
 
+/*  Keys missing from previous batches  */
+
+/* Tab bar */
+"Presets" = "Presets";
+
+/* Tools tab */
+"Quick Actions" = "Quick Actions";
+"Configuration" = "Configuration";
+"Actions write to MobileGestalt.plist. Auto-backup before every write." = "Actions write to MobileGestalt.plist. Auto-backup before every write.";
+"Status Report" = "Status Report";
+"Undo Last Write" = "Undo Last Write";
+"Danger Zone" = "Danger Zone";
+"Undo restores the backup created before the most recent write. Factory Reset disables all tweaks. Neither reverts iPadOS CacheData patches." = "Undo restores the backup created before the most recent write. Factory Reset disables all tweaks. Neither reverts iPadOS CacheData patches.";
+
+/* Presets */
+"No saved presets. Configure tweaks above, then save a preset for quick reuse." = "No saved presets. Configure tweaks above, then save a preset for quick reuse.";
+"%d tweaks" = "%d tweaks";
+"Save your current tweak selections for one-tap reuse." = "Save your current tweak selections for one-tap reuse.";
+"Preset Saved" = "Preset Saved";
+"Preset name" = "Preset name";
+"Create Preset" = "Create Preset";
+"Captures all currently selected tweaks." = "Captures all currently selected tweaks.";
+"Built-in" = "Built-in";
+"Your Presets" = "Your Presets";
+"No saved presets yet." = "No saved presets yet.";
+
+/* Shared Profiles */
+"Shared Profiles" = "Shared Profiles";
+"Field-level configs" = "Field-level configs";
+"A shared profile is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "A shared profile is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — used to share tweak combinations.";
+"Import Patch" = "Import Patch";
+"Export Patch…" = "Export Patch…";
+"A patch contains only the CacheExtra fields the author chose to share. Importing applies it on top of the current plist and writes immediately. Export packages applied tweaks or hand-picked fields into a shareable .weskpatch." = "A patch contains only the CacheExtra fields the author chose to share. Importing applies it on top of the current plist and writes immediately. Export packages applied tweaks or hand-picked fields into a shareable .weskpatch.";
+"No Patches" = "No Patches";
+"Import a shared profile to apply a combination of CacheExtra fields. You can also export your own tweaks to share." = "Import a shared profile to apply a combination of CacheExtra fields. You can also export your own tweaks to share.";
+"Local Patches" = "Local Patches";
+"Delete Profile?" = "Delete Profile?";
+"This profile cannot be recovered after deletion." = "This profile cannot be recovered after deletion.";
+"Name (required)" = "Name (required)";
+"Author (optional)" = "Author (optional)";
+"Notes" = "Notes";
+"Patch Metadata" = "Patch Metadata";
+"Include Applied Tweaks (%d keys)" = "Include Applied Tweaks (%d keys)";
+"Clear Selection (%d)" = "Clear Selection (%d)";
+"No matching keys" = "No matching keys";
+"CacheExtra Keys (%d)" = "CacheExtra Keys (%d)";
+"%d fields" = "%d fields";
+"Manual" = "Manual";
+
+/* Backup library */
+"Delete Backup?" = "Delete Backup?";
+"This backup cannot be recovered after deletion." = "This backup cannot be recovered after deletion.";
+"Backup Preview" = "Backup Preview";
+"Label (optional)" = "Label (optional)";
+"Backup Label" = "Backup Label";
+"Add a note to help identify this backup later." = "Add a note to help identify this backup later.";
+"Backup Date" = "Backup Date";
+"Edit Label" = "Edit Label";
+"Preview Backup" = "Preview Backup";
+
+/* Settings — Utilities */
+"Utilities" = "Utilities";
+"Safe Cleanup" = "Safe Cleanup";
+"Safe Cleanup clears Library/Caches and tmp/ across all apps — your documents and preferences are never touched." = "Safe Cleanup clears Library/Caches and tmp/ across all apps — your documents and preferences are never touched.";
+
+/* Explorer — App Sandboxes collapse */
+"Browse all app data containers on device. Tap to open the full list with search." = "Browse all app data containers on device. Tap to open the full list with search.";
+"System Inspector" = "System Inspector";
+"App Backups" = "App Backups";
+"System Inspector reads sensitive system files. App Backups stores full data container copies." = "System Inspector reads sensitive system files. App Backups stores full data container copies.";
+"No matching containers." = "No matching containers.";
+"Filter by name or bundle ID" = "Filter by name or bundle ID";
+
+/* Explorer — Category Sheet */
+"Quick Access" = "Quick Access";
+"Documents" = "Documents";
+"Library" = "Library";
+"Caches" = "Caches";
+"Preferences" = "Preferences";
+"tmp" = "tmp";
+"Container" = "Container";
+"Container Root" = "Container Root";
+"Browse All Files" = "Browse All Files";
+"Back Up Container" = "Back Up Container";
+"Backing Up" = "Backing Up";
+
+/* Explorer — batch */
+"Select" = "Select";
+"Batch Operation" = "Batch Operation";
+"Archive" = "Archive";
+"Restore to Export folder" = "Restore to Export folder";
+"Mode" = "Mode";
+
+/* PlistViewerView */
+"Unable to parse property list." = "Unable to parse property list.";
+"Search keys" = "Search keys";
+"Int" = "Int";
+"Double" = "Double";
+"Bool" = "Bool";
+"Date" = "Date";
+"Any" = "Any";
+
+/* StructuredFileViewers */
+"%d bytes total" = "%d bytes total";
+"Page %d / %d" = "Page %d / %d";
+"Previous Page" = "Previous Page";
+"Next Page" = "Next Page";
+"(Unable to decode as text)" = "(Unable to decode as text)";
+"Unable to display image." = "Unable to display image.";
+
+/* SQLiteViewerView */
+"Reading database…" = "Reading database…";
+"No tables found or file is not a valid SQLite database." = "No tables found or file is not a valid SQLite database.";
+"Select a table to view its contents." = "Select a table to view its contents.";
+"Load More (%d remaining)" = "Load More (%d remaining)";
+"Showing %d of %d rows" = "Showing %d of %d rows";
+
+/* SystemInspectorView extras */
+"Read At" = "Read At";
+"Risk" = "Risk";
+"Status" = "Status";
+
+/* SystemInspectorModel titles */
+"MobileGestalt Cache Directory" = "MobileGestalt Cache Directory";
+"MobileGestalt SystemGroup Root" = "MobileGestalt SystemGroup Root";
+"SystemGroup Containers" = "SystemGroup Containers";
+"System Data Containers" = "System Data Containers";
+"App Data Containers" = "App Data Containers";
+"App Group Containers" = "App Group Containers";
+"InternalDaemon Containers" = "InternalDaemon Containers";
+"PluginKit Plugin Containers" = "PluginKit Plugin Containers";
+"App Bundle Containers" = "App Bundle Containers";
+
+/* GestaltViewModel */
+"No matching CacheExtra keys to export." = "No matching CacheExtra keys to export.";
+"Exported patch %@ (%d fields)." = "Exported patch %@ (%d fields).";
+"(%d unencodable fields skipped.)" = "(%d unencodable fields skipped.)";
+"The patch file is invalid or uses an unsupported format version." = "The patch file is invalid or uses an unsupported format version.";
+
+/* PresetSheetView */
+"Built-in Presets" = "Built-in Presets";
+"My Presets" = "My Presets";
+"Save Current as Preset" = "Save Current as Preset";
+"Save Preset" = "Save Preset";
+"Preset Name" = "Preset Name";
+"Save the current tweak selection, Dynamic Island subtype, model name, and AI Region setting as a reusable preset." = "Save the current tweak selection, Dynamic Island subtype, model name, and AI Region setting as a reusable preset.";
+
+/* WeskToolEnhancements — built-in preset names */
+"iPhone Air Look" = "iPhone Air Look";
+"iPad Mode on iPhone" = "iPad Mode on iPhone";
+"Minimal Tweaks" = "Minimal Tweaks";
+"Full Spoof" = "Full Spoof";
+
+/* LanguageManager */
+"English" = "English";
+
+/* AppBackupExporter */
+"Some backups could not be deleted:" = "Some backups could not be deleted:";
+"Unknown error" = "Unknown error";
+"Starting backup…" = "Starting backup…";
+"%d files skipped" = "%d files skipped";
+"%d files failed to write" = "%d files failed to write";
+"Export failed" = "Export failed";
+"Delete All" = "Delete All";
+"Delete All Backups?" = "Delete All Backups?";
+"This will permanently remove all app backup data. This action cannot be undone." = "This will permanently remove all app backup data. This action cannot be undone.";
+"Delete Error" = "Delete Error";
+"No App Backups" = "No App Backups";
+"Back up any app's data container from the App Explorer. Backups are stored in GestaltKitTool's private container." = "Back up any app's data container from the App Explorer. Backups are stored in GestaltKitTool's private container.";
+"backups" = "backups";
+"files" = "files";
+
+/* SafeCleanup */
+"Clean" = "Clean";
+"Nothing to Clean" = "Nothing to Clean";
+"No app cache or temporary files were found. Your device is already clean." = "No app cache or temporary files found.";
+"Rescan" = "Rescan";
+"Total Cleanable" = "Total Cleanable";
+"apps" = "apps";
+"Apps with Cache" = "Apps with Cache";
+"Summary" = "Summary";
+"Safe Cleanup only removes Library/Caches and tmp/ directories. Your app data, documents, and preferences are never touched." = "Safe Cleanup only removes Library/Caches and tmp/ directories. Your app data, documents, and preferences are never touched.";
+"Apps" = "Apps";
+"Clear Selection" = "Clear Selection";
+"Cleanup Complete" = "Cleanup Complete";
+"%d apps cleaned" = "%d apps cleaned";
+"%d items deleted" = "%d items deleted";
+"%@ freed so far" = "%@ freed so far";
+
+/* BatchFileOperations */
+"Delete %d item%@?" = "Delete %d item%@?";
+"Selected Items" = "Selected Items";
+"Confirm Delete" = "Confirm Delete";
+"Current:" = "Current:";
+"Errors" = "Errors";
+"Current Directory" = "Current Directory";
+"Quick Destinations" = "Quick Destinations";
+"Move to Custom Path" = "Move to Custom Path";
+"Move to…" = "Move to…";
+"App Groups" = "App Groups";
+"GestaltKitTool Exports" = "GestaltKitTool Exports";
+"Cancel Selection" = "Cancel Selection";
+"%d selected" = "%d selected";
+"Export Selected" = "Export Selected";
+"Move Selected" = "Move Selected";
+"Delete Selected" = "Delete Selected";
+
+/* ArchiveManager errors */
+"Source file not found: %@" = "Source file not found: %@";
+"Failed to read %@: %@" = "Failed to read %@: %@";
+"Failed to write %@: %@" = "Failed to write %@: %@";
+"Failed to enumerate directory: %@" = "Failed to enumerate directory: %@";
+"Source is a directory but contents could not be listed: %@" = "Source is a directory but contents could not be listed: %@";
+"An item with this name already exists in the archive: %@. Delete or rename the existing archive entry first." = "An item with this name already exists in the archive: %@. Delete or rename the existing archive entry first.";
+"Cancelled" = "Cancelled";
+
+/* OS support message */
+"GestaltKitTool currently supports iOS 26.0–26.6.1 and iOS 27 beta 1–4." = "GestaltKitTool currently supports iOS 26.0–26.6.1 and iOS 27 beta 1–4.";
+
+/* The applied-tweaks preset description */
+"The applied-tweaks preset selects every CacheExtra key referenced by a tweak toggle that is currently ON. You can also manually browse and pick arbitrary keys below." = "The applied-tweaks preset selects every CacheExtra key referenced by a tweak toggle that is currently ON. You can also manually browse and pick arbitrary keys below.";
+
+/*  CacheExtraKeyDictionary — known key descriptions  */
+
+/* Category labels */
+"Display" = "Display";
+"Hardware" = "Hardware";
+"iPad" = "iPad";
+"Internal" = "Internal";
+"Identity" = "Identity";
+
+/* ArtworkDevice */
+"ArtworkDevice" = "ArtworkDevice";
+"Contains ArtworkDeviceSubType (Dynamic Island shape) and ArtworkDeviceProductDescription (model name in About). A nested dictionary — tap to edit individual sub-fields." = "Contains ArtworkDeviceSubType (Dynamic Island shape) and ArtworkDeviceProductDescription (model name in About). A nested dictionary — tap to edit individual sub-fields.";
+
+/* Display */
+"Dynamic Island Support Flag" = "Dynamic Island Support Flag";
+"Enables Dynamic Island capability. Set to 1 to enable, 0 to disable. Used together with ArtworkDeviceSubType." = "Enables Dynamic Island capability. Set to 1 to enable, 0 to disable. Used together with ArtworkDeviceSubType.";
+"Always-On Display Flag 1" = "Always-On Display Flag 1";
+"First AOD capability flag. Set to 1 to enable Always-On Display. May increase burn-in risk on unsupported devices." = "First AOD capability flag. Set to 1 to enable Always-On Display. May increase burn-in risk on unsupported devices.";
+"Always-On Display Flag 2" = "Always-On Display Flag 2";
+"Second AOD capability flag. Set to 1 together with Flag 1 to fully enable AOD." = "Second AOD capability flag. Set to 1 together with Flag 1 to fully enable AOD.";
+"AOD Vibrancy" = "AOD Vibrancy";
+"Fixes AOD rendering issues on certain devices. Set to 1 when AOD looks dim or incorrect." = "Fixes AOD rendering issues on certain devices. Set to 1 when AOD looks dim or incorrect.";
+"Wallpaper Parallax" = "Wallpaper Parallax";
+"Controls wallpaper motion parallax based on device tilt. Set to 0 to disable, 1 to enable." = "Controls wallpaper motion parallax based on device tilt. Set to 0 to disable, 1 to enable.";
+"Liquid Glass Low-Performance Mode" = "Liquid Glass Low-Performance Mode";
+"Controls the Liquid Glass low-performance rendering mode (iOS 26+). 1 = enabled, 0 = disabled. Enable/disable are mutually exclusive." = "Controls the Liquid Glass low-performance rendering mode (iOS 26+). 1 = enabled, 0 = disabled. Enable/disable are mutually exclusive.";
+
+/* Hardware */
+"Boot & Shutdown Chime" = "Boot & Shutdown Chime";
+"Enables the device boot and shutdown sound. Set to 1 to enable." = "Enables the device boot and shutdown sound. Set to 1 to enable.";
+"Charge Limit Menu" = "Charge Limit Menu";
+"Shows the charge limit menu in Settings. Actual limiting depends on hardware support. Set to 1 to show." = "Shows the charge limit menu in Settings. Actual limiting depends on hardware support. Set to 1 to show.";
+"Tap to Wake" = "Tap to Wake";
+"Enables tap-to-wake on devices where it's unavailable (e.g. iPhone SE). Set to 1 to enable." = "Enables tap-to-wake on devices where it's unavailable (e.g. iPhone SE). Set to 1 to enable.";
+"Camera Control Settings 1" = "Camera Control Settings 1";
+"Shows iPhone 16 Camera Control settings page. Set to 1 together with the second key." = "Shows iPhone 16 Camera Control settings page. Set to 1 together with the second key.";
+"Camera Control Settings 2" = "Camera Control Settings 2";
+"Second Camera Control capability flag. Set to 1 together with the first key." = "Second Camera Control capability flag. Set to 1 together with the first key.";
+"Apple Pencil Settings" = "Apple Pencil Settings";
+"Shows the Apple Pencil settings page. Set to 1 to enable." = "Shows the Apple Pencil settings page. Set to 1 to enable.";
+"Action Button Settings" = "Action Button Settings";
+"Shows the Action Button settings page. Set to 1 to enable." = "Shows the Action Button settings page. Set to 1 to enable.";
+"Collision SOS" = "Collision SOS";
+"Shows collision detection in SOS settings. Set to 1 to enable." = "Shows collision detection in SOS settings. Set to 1 to enable.";
+
+/* iPad */
+"Stage Manager Support" = "Stage Manager Support";
+"Marks the device as supporting Stage Manager. Set to 1 to enable." = "Marks the device as supporting Stage Manager. Set to 1 to enable.";
+"Allow iPad Apps" = "Allow iPad Apps";
+"Enables iPad app compatibility types on iPhone. Value is an array: [1, 2] = enabled, [] = disabled." = "Enables iPad app compatibility types on iPhone. Value is an array: [1, 2] = enabled, [] = disabled.";
+"iPadOS Mode Flag 1" = "iPadOS Mode Flag 1";
+"First of five capability flags for iPadOS mode. Experimental and high risk — modifies CacheData." = "First of five capability flags for iPadOS mode. Experimental and high risk — modifies CacheData.";
+"iPadOS Mode Flag 2" = "iPadOS Mode Flag 2";
+"Second iPadOS mode capability flag. Part of the 5-flag iPadOS mode set." = "Second iPadOS mode capability flag. Part of the 5-flag iPadOS mode set.";
+"iPadOS Mode Flag 3" = "iPadOS Mode Flag 3";
+"Third iPadOS mode capability flag." = "Third iPadOS mode capability flag.";
+"iPadOS Mode Flag 4" = "iPadOS Mode Flag 4";
+"Fourth iPadOS mode capability flag." = "Fourth iPadOS mode capability flag.";
+"iPadOS Mode Flag 5" = "iPadOS Mode Flag 5";
+"Fifth iPadOS mode capability flag." = "Fifth iPadOS mode capability flag.";
+
+/* Internal */
+"Apple Internal Install" = "Apple Internal Install";
+"Enables internal capabilities such as Metal HUD. Some system services may misbehave. High risk." = "Enables internal capabilities such as Metal HUD. Some system services may misbehave. High risk.";
+"Internal Storage View" = "Internal Storage View";
+"Shows internal files in Storage settings. High risk on some iPads." = "Shows internal files in Storage settings. High risk on some iPads.";
+"Security Research Device Mode" = "Security Research Device Mode";
+"Marks the device as a Security Research Device. High risk." = "Marks the device as a Security Research Device. High risk.";
+
+/* AI Region */
+"Siri AI Region Enabled" = "Siri AI Region Enabled";
+"Master flag for Siri AI (US Region). Set to 1 to enable, 0 to disable. Requires device spoofing on unsupported devices." = "Master flag for Siri AI (US Region). Set to 1 to enable, 0 to disable. Requires device spoofing on unsupported devices.";
+"Spoofed Product Type" = "Spoofed Product Type";
+"Product type used for AI Region spoofing (e.g. 'iPhone16,1'). Empty string = no spoofing." = "Product type used for AI Region spoofing (e.g. 'iPhone16,1'). Empty string = no spoofing.";
+"Spoofed Hardware Model" = "Spoofed Hardware Model";
+"Hardware model for AI Region spoofing (e.g. 'D83AP'). Empty string = no spoofing." = "Hardware model for AI Region spoofing (e.g. 'D83AP'). Empty string = no spoofing.";
+"Spoofed CPU Model" = "Spoofed CPU Model";
+"CPU model for AI Region spoofing (e.g. 't8130'). Empty string = no spoofing." = "CPU model for AI Region spoofing (e.g. 't8130'). Empty string = no spoofing.";
+"Region Code" = "Region Code";
+"Region code for AI Region (e.g. 'LL' = US). Empty string = default." = "Region code for AI Region (e.g. 'LL' = US). Empty string = default.";
+"Regulatory Code" = "Regulatory Code";
+"Regulatory certification code for AI Region (e.g. 'LL/A' = US/FCC). Empty string = default." = "Regulatory certification code for AI Region (e.g. 'LL/A' = US/FCC). Empty string = default.";
+"Regulatory Model Number" = "Regulatory Model Number";
+"Regulatory model number for AI Region (e.g. 'A2848' = iPhone 15 Pro US). Empty string = default." = "Regulatory model number for AI Region (e.g. 'A2848' = iPhone 15 Pro US). Empty string = default.";
+
+/* High-risk tweak confirmation */
+"Enable High-Risk Tweak?" = "Enable High-Risk Tweak?";
+"Enable" = "Enable";
+"This modification may be irreversible. A backup will be created automatically when you apply, but some changes (e.g. CacheData patches) cannot be reverted even with Factory Reset. Proceed only if you understand the risks." = "This modification may be irreversible. A backup will be created automatically when you apply, but some changes (e.g. CacheData patches) cannot be reverted even with Factory Reset. Proceed only if you understand the risks.";
+
+/* P1-1: Onboarding */
+"Welcome" = "Welcome";
+"Next" = "Next";
+"Back" = "Back";
+"I Understand & Continue" = "I Understand & Continue";
+"GestaltKitTool" = "GestaltKitTool";
+"A utility for browsing and modifying the MobileGestalt plist on supported iOS versions." = "A utility for browsing and modifying the MobileGestalt plist on supported iOS versions.";
+"Toggle system features and flags" = "Toggle system features and flags";
+"Browse the sandbox file system" = "Browse the sandbox file system";
+"Create and restore backups" = "Create and restore backups";
+"Apply shared tweak profiles" = "Apply shared tweak profiles";
+"Risk Declaration" = "Risk Declaration";
+"This tool modifies system-level plist files that are normally read-only. Incorrect changes may cause system instability." = "This tool modifies system-level plist files that are normally read-only. Incorrect changes may cause system instability.";
+"A backup is created automatically before each write. You can also create manual backups from the Backups screen." = "A backup is created automatically before each write. You can also create manual backups from the Backups screen.";
+"Changes are applied immediately. After writing, the device will respring (restart SpringBoard) for changes to take effect." = "Changes are applied immediately. After writing, the device will respring (restart SpringBoard) for changes to take effect.";
+"Some changes (e.g. enabling iPadOS mode) are difficult to reverse and may require restoring from a backup." = "Some changes (e.g. enabling iPadOS mode) are difficult to reverse and may require restoring from a backup.";
+"This tool works via a sandbox escape (bad_query). It does not require a jailbreak, but it relies on specific iOS build vulnerabilities that may be patched in future updates." = "This tool works via a sandbox escape (bad_query). It does not require a jailbreak, but it relies on specific iOS build vulnerabilities that may be patched in future updates.";
+"Before You Begin" = "Before You Begin";
+"I understand that I should create a backup before making changes, and that automatic backups are created before each write." = "I understand that I should create a backup before making changes, and that automatic backups are created before each write.";
+"I understand that applying changes will respring my device, causing all apps to close temporarily." = "I understand that applying changes will respring my device, causing all apps to close temporarily.";
+"I understand that some changes may be difficult to reverse, and I accept the risks of using this tool." = "I understand that some changes may be difficult to reverse, and I accept the risks of using this tool.";
+"You can revisit this information anytime from Settings → About." = "You can revisit this information anytime from Settings → About.";
+
+/* P1-2: Apply confirmation */
+"Apply Changes?" = "Apply Changes?";
+"Apply & Respring" = "Apply & Respring";
+"%d changes will be written to the MobileGestalt plist. An automatic backup will be created. After writing, your device will respring — all apps will close temporarily." = "%d changes will be written to the MobileGestalt plist. An automatic backup will be created. After writing, your device will respring — all apps will close temporarily.";
+
+/* P1-3: Apply diff preview */
+"Pending Changes" = "Pending Changes";
+"No changes pending." = "No changes pending.";
+"An automatic backup will be created before writing. After writing, your device will respring." = "An automatic backup will be created before writing. After writing, your device will respring.";
+"Review Changes" = "Review Changes";
+"Continue" = "Continue";
+"Tweak" = "Tweak";
+"Subtype" = "Subtype";
+"Model Name" = "Model Name";
+"Enabled" = "Enabled";
+"Default" = "Default";
+
+/* P1-4: Diagnostics quick-access */
+"Diagnostics…" = "Diagnostics…";
+"Done" = "Done";
+
+/* P1-5: Respring timeout */
+"Respring Timed Out" = "Respring Timed Out";
+"The automatic respring did not complete. Please manually restart your device (power off and back on) for changes to take effect." = "The automatic respring did not complete. Please manually restart your device (power off and back on) for changes to take effect.";
+
+/* P1-6: Cross-device backup warning */
+"⚠️ This backup was created on a different device model (%@). Your current device is %@. Restoring may overwrite device identity and cause unpredictable behavior. The current file will be backed up first." = "⚠️ This backup was created on a different device model (%@). Your current device is %@. Restoring may overwrite device identity and cause unpredictable behavior. The current file will be backed up first.";
+
+/* P2-1: System Tools section */
+"System Tools" = "System Tools";
+"System Inspector reads sensitive system files. App Backups stores full data container copies. Safe Cleanup clears caches and tmp directories." = "System Inspector reads sensitive system files. App Backups stores full data container copies. Safe Cleanup clears caches and tmp directories.";
+
+/* P2-2: Preset dedup */
+"Manage All Presets…" = "Manage All Presets…";
+
+/* P2-3: Unified empty state titles */
+"No Presets" = "No Presets";
+"Configure tweaks above, then save a preset for quick reuse." = "Configure tweaks above, then save a preset for quick reuse.";
+"No Saved Presets" = "No Saved Presets";
+"Pick tweaks on the Tweak tab, then type a name above and tap Save." = "Pick tweaks on the Tweak tab, then type a name above and tap Save.";
+
+/* P2-4: Irreversible tweak warning */
+"⚠️ IRREVERSIBLE: This tweak modifies CacheData bytes that cannot be reverted even by Factory Reset or disabling the tweak. The only way to undo this change is to restore from a backup taken before it was applied." = "⚠️ IRREVERSIBLE: This tweak modifies CacheData bytes that cannot be reverted even by Factory Reset or disabling the tweak. The only way to undo this change is to restore from a backup taken before it was applied.";
+
+/* P2-5: Preset load preview */
+"Preset" = "Preset";
+"Name" = "Name";
+"Tweaks" = "Tweaks";
+"Changes" = "Changes";
+"No changes — this preset matches your current configuration." = "No changes — this preset matches your current configuration.";
+"Loading this preset will replace your current tweak selections. Your MobileGestalt plist is not modified until you tap Apply." = "Loading this preset will replace your current tweak selections. Your MobileGestalt plist is not modified until you tap Apply.";
+"Load Preset" = "Load Preset";
+"Load" = "Load";
+"Dynamic Island Subtype" = "Dynamic Island Subtype";
+"AI Region" = "AI Region";
+
+/* P2-6: About / FAQ */
+"App Name" = "App Name";
+"Supported iOS" = "Supported iOS";
+"View Risk Declaration" = "View Risk Declaration";
+"About" = "About";
+"GestaltKitTool modifies system-level plist files via a sandbox escape. Always create a backup before applying changes." = "GestaltKitTool modifies system-level plist files via a sandbox escape. Always create a backup before applying changes.";
+"FAQ" = "FAQ";
+"What is MobileGestalt?" = "What is MobileGestalt?";
+"MobileGestalt is a system framework that stores device capability information in a plist file. Apps and services read this file to determine what features your device supports." = "MobileGestalt is a system framework that stores device capability information in a plist file. Apps and services read this file to determine what features your device supports.";
+"What is a respring?" = "What is a respring?";
+"A respring restarts SpringBoard (the iOS home screen) without rebooting the entire device. It takes a few seconds and all apps will close temporarily." = "A respring restarts SpringBoard (the iOS home screen) without rebooting the entire device. It takes a few seconds and all apps will close temporarily.";
+"How do I undo changes?" = "How do I undo changes?";
+"Go to Tools → Backups, select a backup from before your changes, and tap Restore. You can also use 'Undo Last Write' in the Danger Zone section." = "Go to Tools → Backups, select a backup from before your changes, and tap Restore. You can also use 'Undo Last Write' in the Danger Zone section.";
+"Why did my tweak revert after restart?" = "Why did my tweak revert after restart?";
+"Some CacheExtra keys are regenerated by system daemons after reboot. This is expected behavior for certain keys. Re-apply your tweaks after restart if needed." = "Some CacheExtra keys are regenerated by system daemons after reboot. This is expected behavior for certain keys. Re-apply your tweaks after restart if needed.";
+
+/* P2-7: Missing keys audit */
+"On" = "On";
+"Off" = "Off";
+"Refresh" = "Refresh";
+"Toggle Bookmark" = "Toggle Bookmark";
+"Unable to parse JSON." = "Unable to parse JSON.";
+
+"File too large to export (>256 MB)" = "File too large to export (>256 MB)";
+"Failed to load patches. A corrupt patch file may have been removed or moved." = "Failed to load patches. A corrupt patch file may have been removed or moved.";
+
+/* Diagnostics — iOS 26.0.x enhancements */
+"Probe Flags (Find RW)" = "Probe Flags (Find RW)";
+"Run All tests bad_query availability, sandbox lease, container discovery, and file read operations. Probe Flags enumerates flag combinations to find one that grants read-write access (diagnostic only, results in Console.app filter [GKTL-ObjC])." = "Run All tests bad_query availability, sandbox lease, container discovery, and file read operations. Probe Flags enumerates flag combinations to find one that grants read-write access (diagnostic only, results in Console.app filter [GKTL-ObjC]).";
+"Flag probe complete. Check Console.app (filter [GKTL-ObjC]) for results.\nLook for lines with canWrite=1 — that flag value grants read-write access." = "Flag probe complete. Check Console.app (filter [GKTL-ObjC]) for results.\nLook for lines with canWrite=1 — that flag value grants read-write access.";
+"Lease acquired for file:\n%@" = "Lease acquired for file:\n%@";
+"Failed to acquire lease: %@" = "Failed to acquire lease: %@";
+"unknown error" = "unknown error";
+"[ iOS 26.0.x detected (build %@) ] bad_query's ContainerManager query was accepted but the kernel refused to issue a sandbox extension. This is a known symptom on early iOS 26.0 builds where the sandbox policy differs from iOS 27. Possible causes:\n  1. The MobileGestalt cache plist has not been generated yet — try respringing once, then rerun diagnostics.\n  2. The bad_query exploit parameters (class=13, part=3, flags=0x8000000000) may need adjustment for this specific build.\n  3. Apple may have partially patched bad_query in this build.\n\nCheck the device console (Console.app, filter [GKTL-ObjC]) for detailed per-stage logs showing exactly where the lease acquisition failed (lstat / create / getSingleResult / copySandboxToken / consume)." = "[ iOS 26.0.x detected (build %@) ] bad_query's ContainerManager query was accepted but the kernel refused to issue a sandbox extension. This is a known symptom on early iOS 26.0 builds where the sandbox policy differs from iOS 27. Possible causes:\n  1. The MobileGestalt cache plist has not been generated yet — try respringing once, then rerun diagnostics.\n  2. The bad_query exploit parameters (class=13, part=3, flags=0x8000000000) may need adjustment for this specific build.\n  3. Apple may have partially patched bad_query in this build.\n\nCheck the device console (Console.app, filter [GKTL-ObjC]) for detailed per-stage logs showing exactly where the lease acquisition failed (lstat / create / getSingleResult / copySandboxToken / consume).";
+"Diagnostics complete." = "Diagnostics complete.";
+
+/* GestaltAccess — read-only mode */
+"The sandbox extension acquired by bad_query only grants READ access on this iOS build. MobileGestalt values can be viewed but cannot be modified. This is a known limitation of iOS 26.0.x where the group-sacrifice flags (0x0800000000) do not convey write permissions." = "The sandbox extension acquired by bad_query only grants READ access on this iOS build. MobileGestalt values can be viewed but cannot be modified. This is a known limitation of iOS 26.0.x where the group-sacrifice flags (0x0800000000) do not convey write permissions.";
+"bad_query acquired a sandbox extension, but the MobileGestalt plist is neither readable nor writable." = "bad_query acquired a sandbox extension, but the MobileGestalt plist is neither readable nor writable.";

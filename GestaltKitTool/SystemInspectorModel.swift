@@ -51,7 +51,7 @@ enum SystemFileCategory: String, CaseIterable, Identifiable {
 struct SystemFileTarget: Identifiable {
     let id: String
     let category: SystemFileCategory
-    let title: String
+    let title: LocalizedStringResource
     let path: String
     let description: String
     let riskLevel: RiskLevel
@@ -82,17 +82,8 @@ struct SystemFileTarget: Identifiable {
             switch self {
             case .low: "checkmark.shield"
             case .medium: "exclamationmark.shield"
-            // C-3: `exclamationmark.triangle.shield` does not exist in
-            //      the SF Symbol set shipped in iOS 26.x — it triggers a
-            //      runtime "No symbol named … found in system symbol set"
-            //      console warning and falls back to a question-mark
-            //      placeholder, which looks wrong and clutters the log.
-            //      `exclamationmark.octagon.fill` (iOS 15+, part of the
-            //      "HIG Warnings" palette) has roughly the same visual
-            //      semantics: an attention-grabbing shape + exclamation
-            //      mark. It is more severe than the .medium shield, so
-            //      the low→medium→high→critical severity order is still
-            //      visually distinct (circle shield → octagon → square).
+            // `exclamationmark.triangle.shield` is not a valid SF Symbol;
+            // `exclamationmark.octagon.fill` is the closest valid high-severity icon.
             case .high: "exclamationmark.octagon.fill"
             case .critical: "xmark.octagon"
             }
@@ -292,7 +283,7 @@ final class SystemInspectorModel: ObservableObject {
         let targetPath = target.path
         let targetParser = target.parser
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        Task.detached(priority: .userInitiated) { [weak self] in
             // First, try to stat the path to check if it's a directory.
             let statResult: BQFileEntry?
             do {

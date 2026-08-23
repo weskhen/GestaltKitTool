@@ -2,9 +2,7 @@
 //  NeoSpringView.swift
 //  GestaltKitTool
 //
-//  Based on rooootdev/neospring. The WebKit respring approach was developed
-//  by neonmodder123 and ported to Swift by skadz108.
-//  https://github.com/rooootdev/neospring
+//  WebKit-based respring view.
 //
 
 import SwiftUI

@@ -1,23 +1,28 @@
 import SwiftUI
-import UIKit
 import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject private var viewModel: GestaltViewModel
     @EnvironmentObject private var languageManager: LanguageManager
+    
+    @AppStorage(UserDefaultsKeys.onboardingCompleted) private var onboardingCompleted = false
 
     var body: some View {
         Group {
-            if GestaltAccess.isRunningSupportedOS() {
+            if !onboardingCompleted {
+                OnboardingView {
+                    onboardingCompleted = true
+                }
+            } else if GestaltAccess.isRunningSupportedOS() {
                 TabView {
                     TweakWorkbench()
-                        .tabItem { Label(String(localized: "MobileGestalt"), systemImage: "switch.2") }
+                        .tabItem { Label(String(localized: "Tweaks"), systemImage: "switch.2") }
+
+                    ToolsTab()
+                        .tabItem { Label(String(localized: "Tools"), systemImage: "wrench.and.screwdriver") }
 
                     FileExplorerView()
                         .tabItem { Label(String(localized: "Explorer"), systemImage: "folder.badge.gearshape") }
-
-                    SystemInspectorView()
-                        .tabItem { Label(String(localized: "Inspector"), systemImage: "shield.lefthalf.filled") }
 
                     SettingsTab()
                         .tabItem { Label(String(localized: "Settings"), systemImage: "gearshape") }
@@ -60,7 +65,16 @@ private struct UnsupportedOSView: View {
 
 private struct TweakWorkbench: View {
     @EnvironmentObject private var viewModel: GestaltViewModel
-    @State private var showsFactoryResetConfirm = false
+    @State private var showsPresetSheet = false
+    @State private var selectedTab: Int = 0
+    
+    @State private var modelNameValidation: ModelNameValidator.Result? = nil
+    
+    @State private var showsApplyConfirm = false
+    
+    @State private var showsApplyPreview = false
+    
+    @State private var showsDiagnosticsFromError = false
 
     var body: some View {
         NavigationStack {
@@ -68,78 +82,27 @@ private struct TweakWorkbench: View {
                 Section { deviceStatus }
 
                 Section {
-                    NavigationLink {
-                        AdvancedGestaltEditor()
-                    } label: {
-                        Label(String(localized: "Advanced Field Editor"), systemImage: "list.bullet.rectangle")
+                    Picker("", selection: $selectedTab) {
+                        Text(String(localized: "Tweaks")).tag(0)
+                        Text(String(localized: "Presets")).tag(1)
                     }
-                    NavigationLink {
-                        BackupLibrary()
-                    } label: {
-                        // Pixel-aligned row layout: icon column (28pt),
-                        // then title+subtitle VStack so both text rows
-                        // share the same left edge.  Same treatment as
-                        // the Patches row below keeps them aligned.
-                        HStack(alignment: .center, spacing: 10) {
-                            Image(systemName: "archivebox.fill")
-                                .font(.title2)
-                                .foregroundStyle(Color.orange)
-                                .frame(minWidth: 28, alignment: .center)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(String(localized: "Backup & Restore"))
-                                    .font(.body.weight(.semibold))
-                                Text(String(localized: "Full plist snapshot"))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.vertical, 2)
-                        .contentShape(Rectangle())
-                    }
-                    NavigationLink {
-                        PatchLibrary()
-                    } label: {
-                        HStack(alignment: .center, spacing: 10) {
-                            Image(systemName: "square.and.arrow.down")
-                                .font(.title2)
-                                .foregroundStyle(Color.blue)
-                                .frame(minWidth: 28, alignment: .center)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(String(localized: "Patches"))
-                                    .font(.body.weight(.semibold))
-                                Text(String(localized: "Field-level patches"))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.vertical, 2)
-                        .contentShape(Rectangle())
-                    }
-                    Button(role: .destructive) {
-                        showsFactoryResetConfirm = true
-                    } label: {
-                        Label(String(localized: "Restore Factory Settings"), systemImage: "arrow.uturn.backward.circle")
-                    }
-                    .disabled(viewModel.plist == nil || viewModel.isBusy)
-                } header: {
-                    Text(String(localized: "Tools"))
-                } footer: {
-                    Text(String(localized: "Restore Factory Settings disables all tweaks by writing default values. A backup is created automatically before writing. iPadOS CacheData patches are not reversible — use backup restore for that."))
+                    .pickerStyle(.segmented)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
                 }
 
-                if viewModel.plist != nil {
-                    tweakSection(.region)
-                    dynamicIslandSection
-                    modelNameSection
+                if selectedTab == 0 {
+                    if viewModel.plist != nil {
+                        tweakSection(.region)
+                        dynamicIslandSection
+                        modelNameSection
 
-                    ForEach(GestaltTweakCategory.allCases.filter { $0 != .region }) { category in
-                        tweakSection(category)
+                        ForEach(GestaltTweakCategory.allCases.filter { $0 != .region }) { category in
+                            tweakSection(category)
+                        }
                     }
-
+                } else {
+                    PresetQuickAccess()
+                        .environmentObject(viewModel)
                 }
 
             }
@@ -151,17 +114,39 @@ private struct TweakWorkbench: View {
                     applyBar
                 }
             }
+            
+            .sheet(isPresented: $showsApplyPreview) {
+                ApplyPreviewSheet(viewModel: viewModel) {
+                    showsApplyPreview = false
+                    showsApplyConfirm = true
+                }
+                .presentationDetents([.medium, .large])
+            }
+            
+            .sheet(isPresented: $showsDiagnosticsFromError) {
+                NavigationStack {
+                    DiagnosticsView()
+                        .navigationTitle(String(localized: "Diagnostics"))
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button(String(localized: "Done")) { showsDiagnosticsFromError = false }
+                            }
+                        }
+                }
+            }
+            
             .confirmationDialog(
-                String(localized: "Restore Factory Settings?"),
-                isPresented: $showsFactoryResetConfirm,
+                String(localized: "Apply Changes?"),
+                isPresented: $showsApplyConfirm,
                 titleVisibility: .visible
             ) {
-                Button(String(localized: "Restore Factory"), role: .destructive) {
-                    viewModel.restoreFactorySettings()
+                Button(String(localized: "Apply & Respring")) {
+                    viewModel.applySelectedTweaks()
                 }
                 Button(String(localized: "Cancel"), role: .cancel) {}
             } message: {
-                Text(String(localized: "All tweaks will be disabled and written to the plist. A backup of the current state is created automatically. This does not revert iPadOS CacheData patches — use backup restore for that."))
+                Text(String(format: String(localized: "%d changes will be written to the MobileGestalt plist. An automatic backup will be created. After writing, your device will respring — all apps will close temporarily."), viewModel.stagedChangeCount))
             }
         }
     }
@@ -209,35 +194,8 @@ private struct TweakWorkbench: View {
 
     @ViewBuilder
     private var deviceStatus: some View {
-        // ── ALIGNMENT FIX ────────────────────────────────────────────
-        //
-        // WHY THE OLD CODE MISALIGNED:
-        //   Row 1 (Status)  used  Label("Current Device", systemImage: "iphone")
-        //   Row 2 (System)  used  Label("System Version", systemImage: "info.circle")
-        //   Row 3 (Build)   used  Text("Build")                       ← NO IMAGE
-        //   Row 4 (iOS)     used  Text("iOS")                         ← NO IMAGE
-        //
-        // SwiftUI List cells have NO built-in left-column alignment
-        // across rows when some cells use Label(image+text) and others
-        // use bare Text.  The label column widths end up:
-        //     Row 1: ~44pt  (22pt SF Symbol + text)
-        //     Row 2: ~40pt  (20pt "info.circle" + text)
-        //     Row 3: ~30pt  (Text-only "Build")
-        //     Row 4: ~22pt  (Text-only "iOS")
-        // → Values on the right start at 4 different X positions.
-        //
-        // FIX: Explicit Grid with 3 columns.
-        //   Column 0 — SF Symbol icon, fixed 22pt width
-        //   Column 1 — Label text, fixed width (taken from the longest
-        //              label "System Version") via .frame(maxWidth:.infinity,
-        //              alignment:.leading) + Grid 统一分配
-        //   Column 2 — Value (right side), aligned .leading or .trailing
-        //
-        // This gives every row pixel-identical left- and right-edges
-        // for both the label and value text.
-        // ─────────────────────────────────────────────────────────────
+        // Use Grid with 3 fixed-width columns for pixel-identical alignment across rows.
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 10) {
-            // ── Row 0: Device / Status ────────────────────────────────
             GridRow {
                 Image(systemName: "iphone")
                     .font(.body.weight(.regular))
@@ -263,8 +221,15 @@ private struct TweakWorkbench: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(String(localized: "Unable to read MobileGestalt"))
                                     .font(.subheadline)
-                                Button(String(localized: "Reload"), action: viewModel.load)
-                                    .font(.caption)
+                                HStack(spacing: 12) {
+                                    Button(String(localized: "Reload"), action: viewModel.load)
+                                        .font(.caption)
+                                    
+                                    Button(String(localized: "Diagnostics…")) {
+                                        showsDiagnosticsFromError = true
+                                    }
+                                        .font(.caption)
+                                }
                             }
                         }
                         .gridCellColumns(2)
@@ -282,7 +247,6 @@ private struct TweakWorkbench: View {
             Divider()
                 .gridCellUnsizedAxes(.horizontal)
 
-            // ── Row 1: System Version + Support badge ─────────────────
             let build   = GestaltAccess.currentOSBuild()
             let version = "\(ProcessInfo.processInfo.operatingSystemVersion.majorVersion).\(ProcessInfo.processInfo.operatingSystemVersion.minorVersion).\(ProcessInfo.processInfo.operatingSystemVersion.patchVersion)"
             let supported = GestaltAccess.isRunningSupportedOS()
@@ -304,7 +268,6 @@ private struct TweakWorkbench: View {
                 }
             }
 
-            // ── Row 2: Build ──────────────────────────────────────────
             GridRow {
                 Image(systemName: "hammer.fill")
                     .font(.body.weight(.regular))
@@ -319,7 +282,6 @@ private struct TweakWorkbench: View {
                     .foregroundStyle(.secondary)
             }
 
-            // ── Row 3: iOS ────────────────────────────────────────────
             GridRow {
                 Image(systemName: "apple.logo")
                     .font(.body.weight(.regular))
@@ -338,7 +300,6 @@ private struct TweakWorkbench: View {
     }
 
     private var dynamicIslandSection: some View {
-        // ── Effective options (C-2 fix) ─────────────────────────────
         //
         // If the device's REAL ArtworkDeviceSubType isn't one of the
         // canned options in `DynamicIslandOption.all` (e.g. 2778 for
@@ -370,11 +331,7 @@ private struct TweakWorkbench: View {
 
         return Section {
             Picker(String(localized: "Device Subtype"), selection: $viewModel.dynamicIslandSubtype) {
-                // C-2: Explicit Optional<Int> typing.
-                //      `.tag(nil)` alone would infer `tag(Never?)` which
-                //      does NOT match a `Binding<Int?>` selection — SwiftUI
-                //      silently ignores it and keeps complaining about
-                //      "selection has no associated tag" for the .none case.
+                // Explicit Optional<Int> typing for the .none tag.
                 Text(String(localized: "No Change"))
                     .tag(Optional<Int>.none)
                 ForEach(effective) { option in
@@ -389,12 +346,34 @@ private struct TweakWorkbench: View {
         }
     }
 
+    
+    private var applyDisabledByModelName: Bool {
+        guard viewModel.changesModelName else { return false }
+        return modelNameValidation?.isValid == false
+    }
+
     private var modelNameSection: some View {
         Section(String(localized: "Device Name")) {
             Toggle(String(localized: "Change model name in About"), isOn: $viewModel.changesModelName)
+                .onChange(of: viewModel.changesModelName) { _, isOn in
+                    if !isOn { modelNameValidation = nil }
+                    else { modelNameValidation = ModelNameValidator.validate(viewModel.modelName) }
+                }
             if viewModel.changesModelName {
                 TextField(String(localized: "Model Name"), text: $viewModel.modelName)
                     .textInputAutocapitalization(.words)
+                    .onChange(of: viewModel.modelName) { _, newValue in
+                        modelNameValidation = ModelNameValidator.validate(newValue)
+                    }
+                
+                if let result = modelNameValidation, !result.isValid {
+                    Label(result.localizedMessage, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                Text(String(format: String(localized: "%d/%d characters"), viewModel.modelName.count, ModelNameValidator.maxLength))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -409,9 +388,13 @@ private struct TweakWorkbench: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button(String(localized: "Apply")) { viewModel.applySelectedTweaks() }
+            if viewModel.isBusy {
+                ProgressView()
+                    .padding(.trailing, 8)
+            }
+            Button(String(localized: "Apply")) { showsApplyPreview = true }
                 .buttonStyle(.borderedProminent)
-                .disabled(viewModel.isBusy)
+                .disabled(viewModel.isBusy || applyDisabledByModelName)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -419,9 +402,528 @@ private struct TweakWorkbench: View {
     }
 }
 
+// MARK: - Apply Diff Preview Sheet
+
+private struct ApplyPreviewSheet: View {
+    @ObservedObject var viewModel: GestaltViewModel
+    let onConfirm: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section(String(localized: "Pending Changes")) {
+                    if viewModel.pendingChangeEntries.isEmpty {
+                        Text(String(localized: "No changes pending."))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(viewModel.pendingChangeEntries) { entry in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(entry.category)
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.secondary.opacity(0.1), in: Capsule())
+                                    Spacer()
+                                }
+                                Text(entry.field)
+                                    .font(.subheadline.weight(.medium))
+                                HStack(spacing: 8) {
+                                    Text(entry.oldValue)
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
+                                        .lineLimit(1)
+                                    Image(systemName: "arrow.right")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    Text(entry.newValue)
+                                        .font(.caption)
+                                        .foregroundStyle(.green)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                }
+
+                Section {
+                    Text(String(localized: "An automatic backup will be created before writing. After writing, your device will respring."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(String(localized: "Review Changes"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(String(localized: "Cancel"), role: .cancel) {}
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "Continue")) { onConfirm() }
+                        .fontWeight(.semibold)
+                        .disabled(viewModel.pendingChangeEntries.isEmpty)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Tools Tab
+
+/// Dedicated Tools tab.
+/// cognitive load on the main Tweak page. Houses Backup, Shared
+/// Profiles, Advanced Editor, Status Report, and Danger Zone.
+private struct ToolsTab: View {
+    @EnvironmentObject private var viewModel: GestaltViewModel
+    @State private var showsFactoryResetConfirm = false
+    @State private var showsStatusReport = false
+    @State private var backupToDelete: GestaltBackup?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                
+                // duplicated here. The Tweak tab's "Presets" segment provides
+                // both quick-access and full management via PresetManagerView.
+
+                
+                Section {
+                    NavigationLink {
+                        BackupLibrary()
+                    } label: {
+                        HStack(alignment: .center, spacing: 10) {
+                            Image(systemName: "archivebox.fill")
+                                .font(.title2)
+                                .foregroundStyle(Color.orange)
+                                .frame(minWidth: 28, alignment: .center)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(String(localized: "Backup & Restore"))
+                                    .font(.body.weight(.semibold))
+                                Text(String(localized: "Full plist snapshot"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 2)
+                        .contentShape(Rectangle())
+                    }
+                    NavigationLink {
+                        PatchLibrary()
+                    } label: {
+                        HStack(alignment: .center, spacing: 10) {
+                            Image(systemName: "square.stack.3d.up")
+                                .font(.title2)
+                                .foregroundStyle(Color.blue)
+                                .frame(minWidth: 28, alignment: .center)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(String(localized: "Shared Profiles"))
+                                    .font(.body.weight(.semibold))
+                                Text(String(localized: "Field-level configs"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 2)
+                        .contentShape(Rectangle())
+                    }
+                    NavigationLink {
+                        AdvancedGestaltEditor()
+                    } label: {
+                        Label(String(localized: "Advanced Field Editor"), systemImage: "list.bullet.rectangle")
+                    }
+                } header: {
+                    Text(String(localized: "Configuration"))
+                } footer: {
+                    Text(String(localized: "Actions write to MobileGestalt.plist. Auto-backup before every write."))
+                }
+
+                
+                Section {
+                    NavigationLink {
+                        SystemInspectorView()
+                    } label: {
+                        Label(String(localized: "System Inspector"), systemImage: "shield.lefthalf.filled")
+                    }
+                    NavigationLink {
+                        AppBackupListView()
+                    } label: {
+                        Label(String(localized: "App Backups"), systemImage: "internaldrive")
+                    }
+                    NavigationLink {
+                        SafeCleanupView()
+                    } label: {
+                        Label(String(localized: "Safe Cleanup"), systemImage: "sparkles")
+                    }
+                } header: {
+                    Text(String(localized: "System Tools"))
+                } footer: {
+                    Text(String(localized: "System Inspector reads sensitive system files. App Backups stores full data container copies. Safe Cleanup clears caches and tmp directories."))
+                }
+
+                
+                Section {
+                    Button {
+                        showsStatusReport = true
+                    } label: {
+                        Label(String(localized: "Status Report"), systemImage: "doc.text.magnifyingglass")
+                    }
+                    .disabled(viewModel.plist == nil)
+                }
+
+                
+                Section {
+                    if viewModel.isBusy {
+                        HStack {
+                            ProgressView()
+                            Text(String(localized: "Working…"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if viewModel.canUndoLastWrite {
+                        Button {
+                            viewModel.undoLastWrite()
+                        } label: {
+                            Label(String(localized: "Undo Last Write"), systemImage: "arrow.uturn.backward")
+                        }
+                        .disabled(viewModel.isBusy)
+                    }
+                    Button(role: .destructive) {
+                        showsFactoryResetConfirm = true
+                    } label: {
+                        Label(String(localized: "Restore Factory Settings"), systemImage: "arrow.uturn.backward.circle")
+                    }
+                    .disabled(viewModel.plist == nil || viewModel.isBusy)
+                } header: {
+                    Text(String(localized: "Danger Zone"))
+                } footer: {
+                    Text(String(localized: "Undo restores the backup created before the most recent write. Factory Reset disables all tweaks. Neither reverts iPadOS CacheData patches."))
+                }
+            }
+            .navigationTitle(String(localized: "Tools"))
+            .navigationBarTitleDisplayMode(.large)
+            .confirmationDialog(
+                String(localized: "Restore Factory Settings?"),
+                isPresented: $showsFactoryResetConfirm,
+                titleVisibility: .visible
+            ) {
+                Button(String(localized: "Restore Factory"), role: .destructive) {
+                    viewModel.restoreFactorySettings()
+                }
+                Button(String(localized: "Cancel"), role: .cancel) {}
+            } message: {
+                Text(String(localized: "All tweaks will be disabled and written to the plist. A backup of the current state is created automatically. This does not revert iPadOS CacheData patches — use backup restore for that."))
+            }
+            .sheet(isPresented: $showsStatusReport) {
+                StatusReportShareView(report: viewModel.generateStatusReport())
+            }
+        }
+    }
+}
+
+// MARK: - Preset Quick Access
+
+/// Inline preset list shown in the Tweak tab's "Presets" segment.
+private struct PresetQuickAccess: View {
+    @EnvironmentObject private var viewModel: GestaltViewModel
+    @State private var presetName = ""
+    @State private var showsSavedAlert = false
+    // Avoid JSON-decoding on every body re-evaluation.
+    @State private var userPresets: [TweakPreset] = []
+    
+    @State private var presetToLoad: TweakPreset?
+
+    var body: some View {
+        Section {
+            // Save current tweaks as a new preset
+            HStack {
+                TextField(String(localized: "Preset name"), text: $presetName)
+                    .textInputAutocapitalization(.words)
+                Button {
+                    guard !presetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                    viewModel.savePreset(name: presetName)
+                    presetName = ""
+                    userPresets = PresetStore.loadUserPresets()
+                    showsSavedAlert = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
+                }
+                .disabled(presetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
+            // Built-in presets
+            let builtIns = TweakPreset.builtIn
+            if builtIns.isEmpty && userPresets.isEmpty {
+                
+                EmptyStateView(
+                    icon: "square.stack.3d.up",
+                    title: String(localized: "No Presets"),
+                    description: String(localized: "Configure tweaks above, then save a preset for quick reuse.")
+                )
+            } else {
+                ForEach(builtIns + userPresets) { preset in
+                    HStack {
+                        Image(systemName: "square.stack.3d.up")
+                            .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(preset.name)
+                                .font(.body)
+                            Text(String(format: String(localized: "%d tweaks"), preset.tweaks.count))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            
+                            presetToLoad = preset
+                        } label: {
+                            Label(String(localized: "Load"), systemImage: "arrow.down.circle")
+                                .labelStyle(.iconOnly)
+                                .font(.title3)
+                                .frame(minWidth: 44, minHeight: 44)
+                                .foregroundStyle(Color.accentColor)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        if !preset.isBuiltIn {
+                            Button(role: .destructive) {
+                                PresetStore.deleteUserPreset(id: preset.id)
+                                userPresets = PresetStore.loadUserPresets()
+                            } label: {
+                                Label(String(localized: "Delete"), systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text(String(localized: "Presets"))
+        } footer: {
+            
+            NavigationLink {
+                PresetManagerView()
+                    .environmentObject(viewModel)
+            } label: {
+                Text(String(localized: "Manage All Presets…"))
+                    .font(.caption)
+            }
+        }
+        .alert(String(localized: "Preset Saved"), isPresented: $showsSavedAlert) {
+            Button(String(localized: "OK"), role: .cancel) {}
+        }
+        .onAppear {
+            userPresets = PresetStore.loadUserPresets()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: PresetStore.didChangeNotification)) { _ in
+            userPresets = PresetStore.loadUserPresets()
+        }
+        
+        .sheet(item: $presetToLoad) { preset in
+            PresetLoadPreviewSheet(
+                preset: preset,
+                viewModel: viewModel
+            ) {
+                viewModel.loadPreset(preset)
+                presetToLoad = nil
+            }
+            .presentationDetents([.medium, .large])
+        }
+    }
+}
+
+// MARK: - Preset Load Preview Sheet
+
+private struct PresetLoadPreviewSheet: View {
+    let preset: TweakPreset
+    @ObservedObject var viewModel: GestaltViewModel
+    let onConfirm: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section(String(localized: "Preset")) {
+                    LabeledContent(String(localized: "Name"), value: preset.name)
+                    LabeledContent(String(localized: "Tweaks"), value: "\(preset.tweaks.count)")
+                }
+
+                let previews = viewModel.presetLoadPreview(preset)
+                Section(String(localized: "Changes")) {
+                    if previews.isEmpty {
+                        Text(String(localized: "No changes — this preset matches your current configuration."))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(previews) { preview in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(preview.tweakName)
+                                    .font(.subheadline.weight(.medium))
+                                HStack(spacing: 8) {
+                                    Text(preview.currentValue)
+                                        .font(.caption)
+                                        .foregroundStyle(preview.isConflict ? .red : .secondary)
+                                    Image(systemName: "arrow.right")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    Text(preview.presetValue)
+                                        .font(.caption)
+                                        .foregroundStyle(preview.isConflict ? .green : .secondary)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                }
+
+                Section {
+                    Text(String(localized: "Loading this preset will replace your current tweak selections. Your MobileGestalt plist is not modified until you tap Apply."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(String(localized: "Load Preset"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(String(localized: "Cancel"), role: .cancel) {}
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "Load")) { onConfirm() }
+                        .fontWeight(.semibold)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Preset Manager View (full screen, from Tools tab)
+
+/// Full-screen preset management — accessed from Tools tab.
+private struct PresetManagerView: View {
+    @EnvironmentObject private var viewModel: GestaltViewModel
+    @State private var presetName = ""
+    // Avoid JSON-decoding on every body re-evaluation.
+    @State private var userPresets: [TweakPreset] = []
+    
+    @State private var presetToLoad: TweakPreset?
+
+    var body: some View {
+        List {
+            Section {
+                HStack {
+                    TextField(String(localized: "Preset name"), text: $presetName)
+                        .textInputAutocapitalization(.words)
+                    Button {
+                        guard !presetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                        viewModel.savePreset(name: presetName)
+                        presetName = ""
+                        userPresets = PresetStore.loadUserPresets()
+                    } label: {
+                        Label(String(localized: "Save"), systemImage: "plus.circle.fill")
+                    }
+                    .disabled(presetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            } header: {
+                Text(String(localized: "Create Preset"))
+            } footer: {
+                Text(String(localized: "Captures all currently selected tweaks."))
+            }
+
+            let builtIns = TweakPreset.builtIn
+            Section(String(localized: "Built-in")) {
+                ForEach(builtIns) { preset in
+                    PresetRow(preset: preset) {
+                        
+                        presetToLoad = preset
+                    }
+                }
+            }
+            Section(String(localized: "Your Presets")) {
+                if userPresets.isEmpty {
+                    
+                    EmptyStateView(
+                        icon: "star",
+                        title: String(localized: "No Saved Presets"),
+                        description: String(localized: "Pick tweaks on the Tweak tab, then type a name above and tap Save.")
+                    )
+                } else {
+                    ForEach(userPresets) { preset in
+                        PresetRow(preset: preset) {
+                            
+                            presetToLoad = preset
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                PresetStore.deleteUserPreset(id: preset.id)
+                                userPresets = PresetStore.loadUserPresets()
+                            } label: {
+                                Label(String(localized: "Delete"), systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle(String(localized: "Presets"))
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            userPresets = PresetStore.loadUserPresets()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: PresetStore.didChangeNotification)) { _ in
+            userPresets = PresetStore.loadUserPresets()
+        }
+        
+        .sheet(item: $presetToLoad) { preset in
+            PresetLoadPreviewSheet(
+                preset: preset,
+                viewModel: viewModel
+            ) {
+                viewModel.loadPreset(preset)
+                presetToLoad = nil
+            }
+            .presentationDetents([.medium, .large])
+        }
+    }
+}
+
+private struct PresetRow: View {
+    let preset: TweakPreset
+    let onLoad: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Image(systemName: "square.stack.3d.up")
+                    .foregroundStyle(Color.accentColor)
+                Text(preset.name)
+                    .font(.body.weight(.semibold))
+                Spacer()
+                Button {
+                    onLoad()
+                } label: {
+                    Text(String(localized: "Load"))
+                        .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            Text(String(format: String(localized: "%d tweaks"), preset.tweaks.count))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
 private struct TweakToggle: View {
     let definition: GestaltTweakDefinition
     @Binding var isOn: Bool
+    @State private var showRiskConfirm = false
 
     var body: some View {
         Toggle(isOn: $isOn) {
@@ -441,20 +943,52 @@ private struct TweakToggle: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .onChange(of: isOn) { _, newValue in
+            if newValue && definition.isRisky {
+                showRiskConfirm = true
+            }
+        }
+        .confirmationDialog(
+            Text(String(localized: "Enable High-Risk Tweak?")),
+            isPresented: $showRiskConfirm,
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "Enable"), role: .destructive) {
+                // User confirmed — keep isOn = true
+            }
+            Button(String(localized: "Cancel"), role: .cancel) {
+                isOn = false  // Revert the toggle
+            }
+        } message: {
+            
+            // tweaks (e.g. iPadOS CacheData patches) vs. general risk.
+            if definition.isIrreversible {
+                Text(definition.detail)
+                    + Text("\n\n")
+                    + Text(String(localized: "⚠️ IRREVERSIBLE: This tweak modifies CacheData bytes that cannot be reverted even by Factory Reset or disabling the tweak. The only way to undo this change is to restore from a backup taken before it was applied."))
+            } else {
+                Text(definition.detail)
+                    + Text("\n\n")
+                    + Text(String(localized: "This modification may be irreversible. A backup will be created automatically when you apply, but some changes (e.g. CacheData patches) cannot be reverted even with Factory Reset. Proceed only if you understand the risks."))
+            }
+        }
     }
 }
 
 private struct BackupLibrary: View {
     @EnvironmentObject private var viewModel: GestaltViewModel
     @State private var backupToRestore: GestaltBackup?
+    @State private var backupToPreview: GestaltBackup?
+    @State private var editingLabelFor: GestaltBackup?
     @State private var showsBackupImporter = false
     @State private var editMode: EditMode = .inactive
     @State private var selectedBackups: Set<GestaltBackup> = []
     @State private var showsBatchDeleteConfirm = false
+    @State private var backupToDelete: GestaltBackup?
 
     var body: some View {
         List(selection: $selectedBackups) {
-            // ── Top banner: explain what Backups are vs Patches ──
+            
             Section {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "archivebox.fill")
@@ -492,17 +1026,27 @@ private struct BackupLibrary: View {
 
             Section(String(localized: "Local Backups")) {
                 if viewModel.backups.isEmpty {
-                    Label(String(localized: "No Backups"), systemImage: "archivebox")
-                        .foregroundStyle(.secondary)
+                    
+                    EmptyStateView(
+                        icon: "archivebox",
+                        title: String(localized: "No Backups"),
+                        description: String(localized: "Create a backup before making changes so you can roll back at any time."),
+                        ctaTitle: String(localized: "Back Up Current MobileGestalt"),
+                        ctaAction: { viewModel.createBackup() },
+                        ctaDisabled: viewModel.plist == nil || viewModel.isBusy
+                    )
                 } else {
                     ForEach(viewModel.backups) { backup in
-                        BackupRow(backup: backup) {
-                            backupToRestore = backup
-                        }
+                        BackupRow(
+                            backup: backup,
+                            restore: { backupToRestore = backup },
+                            preview: { backupToPreview = backup },
+                            editLabel: { editingLabelFor = backup }
+                        )
                         .tag(backup)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
-                                viewModel.delete(backup)
+                                backupToDelete = backup
                             } label: {
                                 Label(String(localized: "Delete"), systemImage: "trash")
                             }
@@ -520,13 +1064,21 @@ private struct BackupLibrary: View {
                         }
                     }
                     .onDelete { offsets in
-                        for index in offsets { viewModel.delete(viewModel.backups[index]) }
+                        if offsets.count == 1 {
+                            backupToDelete = viewModel.backups[offsets.first!]
+                        } else {
+                            // UX: multi-select delete — populate the selection
+                            // set and route through the batch-delete confirmation
+                            // dialog instead of deleting without confirmation.
+                            selectedBackups = Set(offsets.map { viewModel.backups[$0] })
+                            showsBatchDeleteConfirm = true
+                        }
                     }
                 }
             }
         }
         .environment(\.editMode, $editMode)
-        .navigationTitle(String(localized: "Restore"))
+        .navigationTitle(String(localized: "Backups"))
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -570,7 +1122,15 @@ private struct BackupLibrary: View {
             }
             Button(String(localized: "Cancel"), role: .cancel) { backupToRestore = nil }
         } message: {
-            Text(String(localized: "The current file will be backed up first. SpringBoard will refresh automatically after restoring."))
+            
+            if let backup = backupToRestore,
+               let sourcePT = backup.sourceProductType,
+               !sourcePT.isEmpty,
+               sourcePT != DeviceIdentity.currentProductType {
+                Text(String(format: String(localized: "⚠️ This backup was created on a different device model (%@). Your current device is %@. Restoring may overwrite device identity and cause unpredictable behavior. The current file will be backed up first."), sourcePT, DeviceIdentity.currentProductType))
+            } else {
+                Text(String(localized: "The current file will be backed up first. SpringBoard will refresh automatically after restoring."))
+            }
         }
         .confirmationDialog(
             String(format: String(localized: "Delete %d backups?"), selectedBackups.count),
@@ -586,6 +1146,41 @@ private struct BackupLibrary: View {
         } message: {
             Text(String(localized: "This action cannot be undone."))
         }
+        .sheet(isPresented: Binding(
+            get: { backupToPreview != nil },
+            set: { if !$0 { backupToPreview = nil } }
+        )) {
+            if let backupToPreview {
+                BackupPreviewSheet(backup: backupToPreview)
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { editingLabelFor != nil },
+            set: { if !$0 { editingLabelFor = nil } }
+        )) {
+            if let editingLabelFor {
+                let current = editingLabelFor.label
+                BackupLabelEditorSheet(backup: editingLabelFor, currentLabel: current) { newLabel in
+                    viewModel.setBackupLabel(newLabel, for: editingLabelFor)
+                }
+            }
+        }
+        .confirmationDialog(
+            String(localized: "Delete Backup?"),
+            isPresented: Binding(
+                get: { backupToDelete != nil },
+                set: { if !$0 { backupToDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "Delete"), role: .destructive) {
+                if let backupToDelete { viewModel.delete(backupToDelete) }
+                backupToDelete = nil
+            }
+            Button(String(localized: "Cancel"), role: .cancel) { backupToDelete = nil }
+        } message: {
+            Text(String(localized: "This backup cannot be recovered after deletion."))
+        }
     }
 }
 
@@ -594,10 +1189,11 @@ private struct PatchLibrary: View {
     @State private var patchToApply: GestaltPatch?
     @State private var showsPatchImporter = false
     @State private var showsExporter = false
+    @State private var patchToDelete: GestaltPatch?
 
     var body: some View {
         List {
-            // ── Top banner: explain what Patches are vs Backups ──
+            
             Section {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "square.and.arrow.down")
@@ -605,9 +1201,9 @@ private struct PatchLibrary: View {
                         .foregroundStyle(Color.blue)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(String(localized: "Patches"))
+                        Text(String(localized: "Shared Profiles"))
                             .font(.headline)
-                        Text(String(localized: "A patch is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations."))
+                        Text(String(localized: "A shared profile is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -637,8 +1233,15 @@ private struct PatchLibrary: View {
 
             Section {
                 if viewModel.patches.isEmpty {
-                    Label(String(localized: "No Patches"), systemImage: "square.and.arrow.down.on.square")
-                        .foregroundStyle(.secondary)
+                    
+                    EmptyStateView(
+                        icon: "square.and.arrow.down.on.square",
+                        title: String(localized: "No Patches"),
+                        description: String(localized: "Import a shared profile to apply a combination of CacheExtra fields. You can also export your own tweaks to share."),
+                        ctaTitle: String(localized: "Import Patch"),
+                        ctaAction: { showsPatchImporter = true },
+                        ctaDisabled: viewModel.isBusy || viewModel.plist == nil
+                    )
                 } else {
                     ForEach(viewModel.patches) { patch in
                         PatchRow(patch: patch) {
@@ -646,14 +1249,16 @@ private struct PatchLibrary: View {
                         }
                     }
                     .onDelete { offsets in
-                        for index in offsets { viewModel.deletePatch(viewModel.patches[index]) }
+                        if let first = offsets.first {
+                            patchToDelete = viewModel.patches[first]
+                        }
                     }
                 }
             } header: {
                 Text(String(localized: "Local Patches"))
             }
         }
-        .navigationTitle(String(localized: "Patches"))
+        .navigationTitle(String(localized: "Shared Profiles"))
         .navigationBarTitleDisplayMode(.large)
         .refreshable { viewModel.refreshPatches() }
         .onAppear { viewModel.refreshPatches() }
@@ -684,6 +1289,22 @@ private struct PatchLibrary: View {
             Button(String(localized: "Cancel"), role: .cancel) { patchToApply = nil }
         } message: {
             Text(String(localized: "The patch's CacheExtra fields will be merged onto the current plist. A backup is created automatically before writing. SpringBoard will refresh after writing."))
+        }
+        .confirmationDialog(
+            String(localized: "Delete Profile?"),
+            isPresented: Binding(
+                get: { patchToDelete != nil },
+                set: { if !$0 { patchToDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(String(localized: "Delete"), role: .destructive) {
+                if let patchToDelete { viewModel.deletePatch(patchToDelete) }
+                patchToDelete = nil
+            }
+            Button(String(localized: "Cancel"), role: .cancel) { patchToDelete = nil }
+        } message: {
+            Text(String(localized: "This profile cannot be recovered after deletion."))
         }
     }
 }
@@ -898,7 +1519,7 @@ private struct PatchRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if let author = patch.author, !author.isEmpty {
-                        Text("· \(author)")
+                        Text(verbatim: "· \(author)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -922,25 +1543,67 @@ private struct PatchRow: View {
 private struct BackupRow: View {
     let backup: GestaltBackup
     let restore: () -> Void
+    let preview: () -> Void
+    let editLabel: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(backup.createdAt, format: .dateTime.year().month().day().hour().minute().second())
+                HStack(spacing: 4) {
+                    // Integrity badge
+                    if BackupMeta.isIntact(url: backup.url) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                    } else {
+                        Image(systemName: "xmark.seal.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                    }
+                    // Manual vs auto badge
+                    if backup.isManual {
+                        Text(String(localized: "Manual"))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.blue)
+                    }
+                    Text(backup.createdAt, format: .dateTime.year().month().day().hour().minute().second())
+                }
+                // Show label if set
+                if let label = backup.label, !label.isEmpty {
+                    Text(label)
+                        .font(.caption)
+                        .foregroundStyle(.primary)
+                }
                 Text(ByteCountFormatter.string(fromByteCount: backup.byteCount, countStyle: .file))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            // Preview button
+            Button {
+                preview()
+            } label: {
+                Image(systemName: "doc.text.magnifyingglass")
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(String(localized: "Preview Backup"))
+            // Label edit button
+            Button {
+                editLabel()
+            } label: {
+                Image(systemName: "tag")
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(String(localized: "Edit Label"))
             ShareLink(item: backup.url) {
                 Image(systemName: "square.and.arrow.up")
             }
-            .accessibilityLabel("Export Backup")
+            .accessibilityLabel(String(localized: "Export Backup"))
             Button("Restore", action: restore)
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.capsule)
             .controlSize(.small)
-            .accessibilityLabel("Restore Backup")
+            .accessibilityLabel(String(localized: "Restore Backup"))
         }
     }
 }
@@ -1145,19 +1808,49 @@ private struct KeyRow: View {
     let key: String
     let value: Any?
 
+    private var keyInfo: CacheExtraKeyDictionary.Entry? {
+        CacheExtraKeyDictionary.info(forKey: key)
+    }
+
     var body: some View {
         let info = PlistValueInfo.info(for: value)
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(key)
-                    .font(.system(.body, design: .monospaced))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(info.summary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                if let keyInfo {
+                    HStack(spacing: 6) {
+                        Text(LocalizedStringResource(stringLiteral: keyInfo.label))
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Text(LocalizedStringResource(stringLiteral: keyInfo.category))
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.accentColor.opacity(0.12))
+                            .foregroundStyle(Color.accentColor)
+                            .clipShape(Capsule())
+                    }
+                    Text(key)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                            Text(LocalizedStringResource(stringLiteral: keyInfo.description))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                } else {
+                    // Unknown key — show raw key + value summary only.
+                    Text(key)
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text(info.summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
             }
             Spacer()
             Image(systemName: "chevron.right")
@@ -1199,6 +1892,31 @@ private struct ValueEditor: View {
     var body: some View {
         NavigationStack {
             Form {
+                if let keyInfo = CacheExtraKeyDictionary.info(forKey: key) {
+                    Section {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 6) {
+                                Text(LocalizedStringResource(stringLiteral: keyInfo.label))
+                                    .font(.headline)
+                                Text(LocalizedStringResource(stringLiteral: keyInfo.category))
+                                    .font(.caption2)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.accentColor.opacity(0.12))
+                                    .foregroundStyle(Color.accentColor)
+                                    .clipShape(Capsule())
+                            }
+                    Text(LocalizedStringResource(stringLiteral: keyInfo.description))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(key)
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(.tertiary)
+                                .textSelection(.enabled)
+                        }
+                    }
+                }
+
                 Section("Type") {
                     Picker("Type", selection: $kind) {
                         ForEach(PlistValueKind.allCases) { kind in
@@ -1218,8 +1936,8 @@ private struct ValueEditor: View {
 
                 if let errorMessage {
                     Section {
-                        Text(errorMessage)
-                            .foregroundStyle(.red)
+                        
+                        InlineErrorBanner(message: errorMessage)
                     }
                 }
 
@@ -1232,7 +1950,7 @@ private struct ValueEditor: View {
                     }
                 }
             }
-            .navigationTitle(key)
+            .navigationTitle(Text(navigationTitle))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -1266,6 +1984,13 @@ private struct ValueEditor: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private var navigationTitle: LocalizedStringResource {
+        if let label = CacheExtraKeyDictionary.info(forKey: key)?.label {
+            return LocalizedStringResource(stringLiteral: label)
+        }
+        return LocalizedStringResource(stringLiteral: key)
     }
 }
 
@@ -1309,8 +2034,8 @@ private struct AddCacheExtraFieldEditor: View {
 
                 if let errorMessage {
                     Section {
-                        Text(errorMessage)
-                            .foregroundStyle(.red)
+                        
+                        InlineErrorBanner(message: errorMessage)
                     }
                 }
             }
@@ -1341,6 +2066,9 @@ private struct AddCacheExtraFieldEditor: View {
 
 private struct SettingsTab: View {
     @EnvironmentObject private var languageManager: LanguageManager
+    
+    @AppStorage(UserDefaultsKeys.onboardingCompleted) private var onboardingCompleted = true
+    @State private var showsOnboarding = false
 
     var body: some View {
         NavigationStack {
@@ -1383,12 +2111,218 @@ private struct SettingsTab: View {
                 } header: {
                     Text("Troubleshooting")
                 } footer: {
-                    Text("Test bad_query availability, sandbox lease, container discovery, and file read operations.")
+                    Text("Tests bad_query availability, sandbox lease, container discovery, and file read operations.")
+                }
+
+                
+                Section {
+                    LabeledContent("App Name", value: "GestaltKitTool")
+                    LabeledContent("Supported iOS", value: "26.0–26.6.1, 27 beta 1–4")
+                    Button {
+                        showsOnboarding = true
+                    } label: {
+                        Label("View Risk Declaration", systemImage: "exclamationmark.triangle")
+                    }
+                } header: {
+                    Text("About")
+                } footer: {
+                    Text("GestaltKitTool modifies system-level plist files via a sandbox escape. Always create a backup before applying changes.")
+                }
+
+                
+                Section {
+                    FAQRow(
+                        question: String(localized: "What is MobileGestalt?"),
+                        answer: String(localized: "MobileGestalt is a system framework that stores device capability information in a plist file. Apps and services read this file to determine what features your device supports.")
+                    )
+                    FAQRow(
+                        question: String(localized: "What is a respring?"),
+                        answer: String(localized: "A respring restarts SpringBoard (the iOS home screen) without rebooting the entire device. It takes a few seconds and all apps will close temporarily.")
+                    )
+                    FAQRow(
+                        question: String(localized: "How do I undo changes?"),
+                        answer: String(localized: "Go to Tools → Backups, select a backup from before your changes, and tap Restore. You can also use 'Undo Last Write' in the Danger Zone section.")
+                    )
+                    FAQRow(
+                        question: String(localized: "Why did my tweak revert after restart?"),
+                        answer: String(localized: "Some CacheExtra keys are regenerated by system daemons after reboot. This is expected behavior for certain keys. Re-apply your tweaks after restart if needed.")
+                    )
+                } header: {
+                    Text("FAQ")
                 }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
+            
+            .sheet(isPresented: $showsOnboarding) {
+                OnboardingView {
+                    showsOnboarding = false
+                }
+            }
         }
+    }
+}
+
+// MARK: - FAQ Row
+
+private struct FAQRow: View {
+    let question: String
+    let answer: String
+    @State private var isExpanded = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            Text(answer)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
+        } label: {
+            Text(question)
+                .font(.subheadline.weight(.medium))
+        }
+    }
+}
+
+// MARK: - Backup Preview Sheet
+
+private struct BackupPreviewSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let backup: GestaltBackup
+
+    @State private var previewText: String = ""
+    @State private var isLoading = true
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                if isLoading {
+                    ProgressView()
+                        .padding()
+                } else {
+                    Text(previewText)
+                        .font(.system(.caption, design: .monospaced))
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
+            }
+            .navigationTitle(String(localized: "Backup Preview"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(String(localized: "Done")) { dismiss() }
+                }
+            }
+        }
+        .task {
+            await loadPreview()
+        }
+    }
+
+    private func loadPreview() async {
+        do {
+            let data = try GestaltBackupStore.data(for: backup)
+            var format = PropertyListSerialization.PropertyListFormat.binary
+            if let dict = try PropertyListSerialization.propertyList(
+                from: data,
+                options: [],
+                format: &format
+            ) as? [String: Any] {
+                let sortedKeys = dict.keys.sorted()
+                var lines: [String] = []
+                lines.append("File: \(backup.url.lastPathComponent)")
+                lines.append("Size: \(ByteCountFormatter.string(fromByteCount: backup.byteCount, countStyle: .file))")
+                lines.append("")
+                for key in sortedKeys {
+                    let value = dict[key]
+                    let info = PlistValueInfo.info(for: value)
+                    lines.append("\(key): \(info.summary)")
+                }
+                await MainActor.run {
+                    previewText = lines.joined(separator: "\n")
+                    isLoading = false
+                }
+            }
+        } catch {
+            await MainActor.run {
+                previewText = "Error: \(ErrorHandler.friendlyMessage(for: error))"
+                isLoading = false
+            }
+        }
+    }
+}
+
+// MARK: - Backup Label Editor Sheet
+
+private struct BackupLabelEditorSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let backup: GestaltBackup
+    let currentLabel: String?
+    let onSave: (String?) -> Void
+
+    @State private var label: String
+
+    init(backup: GestaltBackup, currentLabel: String?, onSave: @escaping (String?) -> Void) {
+        self.backup = backup
+        self.currentLabel = currentLabel
+        self.onSave = onSave
+        _label = State(initialValue: currentLabel ?? "")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField(String(localized: "Label (optional)"), text: $label)
+                } header: {
+                    Text(String(localized: "Backup Label"))
+                } footer: {
+                    Text(String(localized: "Add a note to help identify this backup later."))
+                }
+                Section {
+                    Text(backup.createdAt, format: .dateTime.year().month().day().hour().minute().second())
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text(String(localized: "Backup Date"))
+                }
+            }
+            .navigationTitle(String(localized: "Edit Label"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(String(localized: "Cancel")) { dismiss() }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(String(localized: "Save")) {
+                        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+                        onSave(trimmed.isEmpty ? nil : trimmed)
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Unified Inline Error Banner
+
+/// Reusable inline error banner for form-level validation errors.
+/// Provides consistent visual styling across all editor views.
+struct InlineErrorBanner: View {
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "xmark.octagon.fill")
+                .foregroundStyle(.red)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 4)
     }
 }
 

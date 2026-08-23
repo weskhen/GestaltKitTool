@@ -126,6 +126,22 @@ struct AIRegionProfile: Equatable {
     }
 }
 
+// MARK: - Device Identity
+
+/// Used for cross-device backup mismatch detection.
+enum DeviceIdentity {
+    static var currentProductType: String {
+        var size = 0
+        guard sysctlbyname("hw.machine", nil, &size, nil, 0) == 0,
+              size > 0 else { return "" }
+        var value = [CChar](repeating: 0, count: size)
+        guard sysctlbyname("hw.machine", &value, &size, nil, 0) == 0 else {
+            return ""
+        }
+        return String(cString: value)
+    }
+}
+
 struct AIRegionConfiguration: Equatable {
     let profile: AIRegionProfile
     let spoofedProductType: String?
@@ -164,7 +180,7 @@ struct AIRegionConfiguration: Equatable {
 }
 
 struct GestaltNotice: Identifiable, Equatable {
-    enum Kind: Equatable { case error, backupCreated, riskWarning }
+    enum Kind: Equatable { case error, backupCreated, riskWarning, respringTimeout }
 
     let id = UUID()
     let kind: Kind
@@ -175,6 +191,7 @@ struct GestaltNotice: Identifiable, Equatable {
         case .error: String(localized: "Operation Failed")
         case .backupCreated: String(localized: "Backup Complete")
         case .riskWarning: String(localized: "High Risk")
+        case .respringTimeout: String(localized: "Respring Timed Out")
         }
     }
 }

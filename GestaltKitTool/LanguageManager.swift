@@ -34,7 +34,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         switch self {
         case .system: String(localized: "Follow System")
         case .zhHans: "简体中文"
-        case .en: "English"
+        case .en: String(localized: "English")
         }
     }
 

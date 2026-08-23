@@ -86,10 +86,19 @@ struct QuickPath: Identifiable {
         case user      = "User Data"
         case developer = "Developer"
         case local     = "Local Storage"
+
+        var localizedLabel: String {
+            switch self {
+            case .system:    return String(localized: "System")
+            case .user:      return String(localized: "User Data")
+            case .developer: return String(localized: "Developer")
+            case .local:     return String(localized: "Local Storage")
+            }
+        }
     }
 }
 
-// MARK: - Search Filters (OPT-C)
+// MARK: - Search Filters
 
 /// Which container set a recursive search should walk. Mirrors Filza's
 /// "Scope: Current App / All Apps" search scope selector.
@@ -240,13 +249,11 @@ final class FileExplorerModel: ObservableObject {
     @Published var isSearching = false
     @Published var searchProgress = ""
 
-    // CR-27: Scroll position memory — remembers the last visible
-    // entry for each directory path so users return to the same spot
-    // after navigating into a subdirectory and coming back.
+    // Scroll position memory — remembers the last visible entry per directory.
     @Published var scrollRestoreTarget: String?
     private var _scrollPositionCache: [String: String] = [:]
 
-    // MARK: - Archive state (CR-30 copy-style archive)
+    // MARK: - Archive state
 
     /// Aggregate size of all archive entries, recomputed when the
     /// archive listing is requested by the UI.
@@ -255,59 +262,42 @@ final class FileExplorerModel: ObservableObject {
     /// Set by archive actions so the UI can show progress / toast.
     @Published var archiveLastMessage: String? = nil
 
-    // CR-16 v6: Entry cache keyed by absolute directory path.
-    //
-    // MOTIVATION (why this cache is critical):
-    //   Before caching, every browse-result set the ONE AND ONLY
-    //   `currentEntries` array. When a nested browse FAILED and the
-    //   error path ran `rollbackPrePushedNavigationIfNeeded()` +
-    //   `currentEntries = []`, users saw a blank listing at the
-    //   PARENT directory level. Worse, navigateBack relied on
-    //   RE-BROWSING the parent directory — if that also timed out or
-    //   the lease was revoked mid-flight, the user got stuck at an
-    //   empty root. In cases where SwiftUI's NavigationStack tried to
-    //   push a Searchable / focused TextField during the "empty
-    //   state → parent content" transition, UIKit couldn't find the
-    //   owning FBScene for KeyboardInputScene — producing the
-    //   "cannot add handler to 0 from 0" / "No scene exists for
-    //   identity: KeyboardInputScene" crashes reported by users.
-    //
-    // GUARANTEES this cache provides:
-    //   1. Navigation stack rollback is ATOMIC: nav + entries restore
-    //      together, never a "nav says /A but entries are /B" window.
-    //   2. navigateBack / navigateToIndex / breadcrumbs resolve in
-    //      O(1) memory lookup, 0 XPC, 0 re-browse → no timeout risk.
-    //   3. Even if a new browse of path X is in-flight, rollback can
-    //      use the PREVIOUS cached result for path X — users see the
-    //      last-known-good listing instead of a blank spinner.
-    //   4. When view first mounts (navigationPath empty → root listing)
-    //      and user taps App Group containers from sidebar, which call
-    //      enterContainer/enterQuickPath, we cache those too.
+    // Entry cache keyed by absolute directory path.
+    // Provides atomic navigation rollback, O(1) navigateBack, and resilience to browse failures.
+    private let maxCachedPaths = 200
+    private var _entryCacheAccessOrder: [String] = []  // oldest first, newest last
     private var _entryCache: [String: [BQFileEntry]] = [:]
 
+    /// Touch a cache key in the LRU order (move to end).
+    private func _touchCacheKey(_ key: String) {
+        _entryCacheAccessOrder.removeAll { $0 == key }
+        _entryCacheAccessOrder.append(key)
+    }
+
+    /// Evict oldest entries when cache exceeds `maxCachedPaths`.
+    private func _evictExcessCacheEntries() {
+        while _entryCacheAccessOrder.count > maxCachedPaths {
+            let oldest = _entryCacheAccessOrder.removeFirst()
+            _entryCache.removeValue(forKey: oldest)
+        }
+    }
+
+    private func clearCachesOnMemoryPressure() {
+        _entryCache.removeAll()
+        _entryCacheAccessOrder.removeAll()
+        _scrollPositionCache.removeAll()
+        gktlLog("[GKTL-Browse] memory pressure — cleared entry cache and scroll position cache")
+    }
+
     /// Restore `currentEntries` from the cache for `path`.
-    /// Returns true if cache hit. Caller can skip re-browse on hit.
-    // ISSUE-5: Consolidate 3 dictionary lookups into 1. Key exists →
-    // treat as cache hit regardless of whether value is []. An empty
-    // array sentinel means "we already enumerated this directory and
-    // it is truly empty" — rendering the placeholder UI is exactly
-    // what we want, same as non-empty cached results.
+    /// Returns true if cache hit. An empty array sentinel means "truly empty directory".
     @discardableResult
     private func _restoreCachedEntries(for path: String) -> Bool {
-        // CR-26: Use normalized path as cache key so /var/mobile/Library
-        // and /private/var/mobile/Library (same dir, different string)
-        // hit the same cache entry. Previously, if a dir was browsed
-        // as /var/X and later accessed as /private/var/X (e.g. via
-        // CR-23 parent-chain construction), the cache would miss →
-        // re-browse → new cache entry under a different key → stale
-        // old cache entry never evicted → potential memory growth.
+        // Use normalized path as cache key so /var/X and /private/var/X hit the same entry.
         let normKey = Self._normalizePath(path)
         if let cached = _entryCache[normKey] {
-            // CR-26: Re-dedupe on restore as a safety net — catches
-            // any duplicates that may have slipped through if the
-            // cache was populated by an older code path (pre-CR-19)
-            // or if the ObjC layer returned duplicates that the Swift
-            // dedupe at write-time somehow missed.
+            _touchCacheKey(normKey)
+            // Re-dedupe on restore as a safety net.
             var seen: Set<String> = []
             seen.reserveCapacity(cached.count)
             let cleanEntries = cached.filter { entry in
@@ -316,7 +306,7 @@ final class FileExplorerModel: ObservableObject {
             }
             let removedDups = cached.count - cleanEntries.count
             if removedDups > 0 {
-                gktlLog("[GKTL-Browse] restore-cache ⚠️ LATE-DEDUP removed=%d from cached entries for path=%@",
+                gktlLog("[GKTL-Browse] restore-cache LATE-DEDUP removed=%d from cached entries for path=%@",
                       removedDups, String(path.suffix(36)))
                 // Overwrite cache with clean version.
                 _entryCache[normKey] = cleanEntries
@@ -329,47 +319,24 @@ final class FileExplorerModel: ObservableObject {
         return false
     }
 
-    // MARK: Empty-directory filter (ISSUE-7, bg-thread safe)
+    // MARK: Empty-directory filter
 
-    /// ISSUE-7 (user request: "empty dirs → hide from listing"):
-    /// Drop entries whose `isDirectory` is true AND that we can
-    /// POSITIVELY prove contain zero children via opendir+readdir
-    /// (only "." and ".." present). Runs on a background thread —
-    /// touches no MainActor-isolated state.
+    /// Drops directory entries confirmed empty via opendir+readdir.
+    /// Runs on a background thread — touches no MainActor-isolated state.
     ///
-    /// Conservative rule: if opendir() fails for any reason
-    /// (EPERM / EACCES / sandbox-extension missing / path not
-    /// accessible) the entry is KEPT. We only hide directories we
-    /// can authoritatively confirm are empty.
+    /// Conservative rule: if opendir() fails for any reason the entry is KEPT.
+    /// Only directories confirmed empty by opendir are hidden.
     nonisolated private func _filterOutEmptyDirectories(
         _ entries: [BQFileEntry]
     ) -> [BQFileEntry] {
-        // Per-entry opendir probe — typically <5ms on local APFS. If
-        // a single entry exceeds SLOW_ENTRY_MS it almost certainly
-        // means: (a) path is on a slow mount (Network / ExFAT USB),
-        // (b) opendir triggered a synchronous sandbox-ext negotiation
-        // with bad_query / ContainerManager XPC (100–800ms common on
-        // deep container paths), or (c) the directory has lots of
-        // dentries and readdir() is forced to walk N hash buckets
-        // before finding "."/ ".." / first child. We log those so
-        // perf regressions can be diagnosed.
-        //
-        // ── SAFEGUARDS (per Issue-A user request) ────────────────
-        //   MAX_ENTRIES   : if entries.count > 200, SKIP filter entirely.
-        //                   Avoids pathological cases like /var/root or
-        //                   /Library with thousands of subdirs where
-        //                   total filter time would exceed 500ms.
-        //   MAX_TOTAL_MS  : hard wall-clock budget. Break early if
-        //                   cumulative opendir time exceeds 500ms —
-        //                   remaining entries are KEPT (conservative).
-        //   SLOW_ENTRY_MS : per-entry threshold for 🐢 SLOW-SCAN log.
+        // Safeguards: maxEntries skips filter for large dirs; maxTotalMs is a wall-clock budget.
         let SLOW_ENTRY_MS: Double = 200.0
         let MAX_ENTRIES: Int = 200
         let MAX_TOTAL_MS: Double = 500.0
 
         // Safeguard 1: too many entries → skip filter entirely.
         if entries.count > MAX_ENTRIES {
-            gktlLog("[GKTL-Browse] empty-dir-filter ⏭ SKIP entries.count=%d > %d (safeguard: avoid pathological slow scan)",
+            gktlLog("[GKTL-Browse] empty-dir-filter SKIP entries.count=%d > %d (safeguard: avoid pathological slow scan)",
                   entries.count, MAX_ENTRIES)
             return entries
         }
@@ -382,7 +349,7 @@ final class FileExplorerModel: ObservableObject {
             // Safeguard 2: budget exhausted → bail early, keep rest.
             let elapsedMs = (CFAbsoluteTimeGetCurrent() - tStart) * 1000.0
             if elapsedMs >= MAX_TOTAL_MS {
-                gktlLog("[GKTL-Browse] empty-dir-filter ⏰ BUDGET-EXHAUSTED elapsed=%.0fms ≥ %.0fms — kept remaining %d entries unfiltered",
+                gktlLog("[GKTL-Browse] empty-dir-filter BUDGET-EXHAUSTED elapsed=%.0fms ≥ %.0fms — kept remaining %d entries unfiltered",
                       elapsedMs, MAX_TOTAL_MS, entries.count - filtered.count)
                 filtered.append(contentsOf: entries[filtered.count..<entries.count])
                 break
@@ -416,7 +383,7 @@ final class FileExplorerModel: ObservableObject {
             let ms = (CFAbsoluteTimeGetCurrent() - t0) * 1000.0
             if ms >= SLOW_ENTRY_MS {
                 let name = URL(fileURLWithPath: entry.fullPath).lastPathComponent
-                gktlLog("[GKTL-Browse] empty-dir-filter 🐢 SLOW-SCAN path=…%@ isEmpty=%d (%.0fms — >%.0fms threshold)",
+                gktlLog("[GKTL-Browse] empty-dir-filter SLOW-SCAN path=…%@ isEmpty=%d (%.0fms — >%.0fms threshold)",
                       String(name.suffix(40)), result ? 0 : 1, ms, SLOW_ENTRY_MS)
             }
             if result {
@@ -426,21 +393,11 @@ final class FileExplorerModel: ObservableObject {
         return filtered
     }
 
-    // MARK: Empty-directory tap guard (CR-18)
+    // MARK: Empty-directory tap guard
 
-    /// CR-18 (per user request): "点击空目录,不触发搜索栏下方的路径记录,
-    /// 因为会出现无限嵌套的异常".
-    ///
-    /// Returns true if `path` is a confirmed-empty directory (only
-    /// "." / ".." children, or opendir succeeds and readdir returns
-    /// only the two pseudo-entries). Conservative: any failure
-    /// (opendir EPERM, readdir error) returns false → caller treats
-    /// as non-empty, lets normal navigation proceed.
-    ///
-    /// Used by navigateInto / handleSearchResultTap to BLOCK entry
-    /// into empty dirs — prevents breadcrumb pollution and the
-    /// "infinite nesting" symptom users reported when tapping into
-    /// empty dirs from search results.
+    /// Returns true if `path` is a confirmed-empty directory.
+    /// Conservative: any failure returns false → normal navigation proceeds.
+    /// Prevents breadcrumb pollution and "infinite nesting" when tapping empty dirs.
     nonisolated private func _isEmptyDirectory(_ path: String) -> Bool {
         return path.withCString { fsRep -> Bool in
             guard let dir = opendir(fsRep) else {
@@ -462,7 +419,7 @@ final class FileExplorerModel: ObservableObject {
         }
     }
 
-    // MARK: Search filter state (OPT-C)
+    // MARK: Search filter state
 
     /// Controls which container set is searched. Mirrors Filza's scope
     /// segmented control. Default: `.auto` (empty nav → global, else →
@@ -494,7 +451,7 @@ final class FileExplorerModel: ObservableObject {
 
     // MARK: Lifecycle — cross-tab background-task cancellation
 
-    /// D-4: Raised by DiagnosticsView (via NotificationCenter) just
+    /// Raised by DiagnosticsView (via NotificationCenter) just
     /// before it runs the diagnostics suite so any lingering Explorer
     /// background work (discoverContainers / recursive search) does not
     /// contend with diagnostics on the ContainerManager XPC queue —
@@ -504,9 +461,11 @@ final class FileExplorerModel: ObservableObject {
     private let discoverCancelledLock = NSLock()
     private nonisolated(unsafe) var discoverCancelledFlag: Bool = false
     private var observer: NSObjectProtocol?
+    private var memoryObserver: NSObjectProtocol?
 
     deinit {
         if let observer { NotificationCenter.default.removeObserver(observer) }
+        if let memoryObserver { NotificationCenter.default.removeObserver(memoryObserver) }
     }
 
     /// Returns YES if discoverContainers has been requested to stop by
@@ -574,7 +533,6 @@ final class FileExplorerModel: ObservableObject {
         searchResults = []
     }
 
-    // H-8/H-10: Thread-safe search cancellation + generation token.
     // The searchGeneration is incremented on every new search. Background
     // tasks capture their generation number and bail out if it no longer
     // matches the current generation, preventing stale results from
@@ -604,7 +562,7 @@ final class FileExplorerModel: ObservableObject {
     init() {
         loadFavorites()
 
-        // D-4: Cross-tab cancellation handshake. DiagnosticsModel posts
+        // Cross-tab cancellation handshake. DiagnosticsModel posts
         // this notification the moment "Run All Diagnostics" is tapped
         // so any Explorer background work (container discovery,
         // recursive search) is stopped cleanly — both releases the
@@ -618,7 +576,7 @@ final class FileExplorerModel: ObservableObject {
             object: nil,
             queue: nil
         ) { [weak self] _ in
-            // ISSUE-2 (Swift 6 Strict Concurrency fix): DispatchQueue.main
+            // (Swift 6 Strict Concurrency fix): DispatchQueue.main
             // (GCD) is NOT equivalent to the MainActor executor as a
             // language-level guarantee. MainActor.assumeIsolated would
             // assert-fail if ever called outside the true MainActor
@@ -634,6 +592,16 @@ final class FileExplorerModel: ObservableObject {
                 // Task bodies). See raiseDiscoverCancelled().
                 self.raiseDiscoverCancelled()
                 self.isLoading = false
+            }
+        }
+
+        memoryObserver = NotificationCenter.default.addObserver(
+            forName: MemoryPressureMonitor.didReceiveWarning,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.clearCachesOnMemoryPressure()
             }
         }
     }
@@ -728,9 +696,9 @@ final class FileExplorerModel: ObservableObject {
 
     // MARK: - Container Discovery
 
-    /// CR-13: iOS container roots (/var/mobile/Containers/Data/Application,
+    /// iOS container roots (/var/mobile/Containers/Data/Application,
     /// /var/mobile/Containers/Shared/AppGroup, /var/containers/Shared/
-    /// SystemGroup) contain ONLY directories named as UUIDs or
+    /// SystemGroup) contain only directories named as UUIDs or
     /// systemgroup.* / group.* identifiers. When stat is blocked by the
     /// sandbox (isDirectory == false, fileSize == 0), a name that matches
     /// this shape is still a directory; anything else is a stray file
@@ -770,12 +738,12 @@ final class FileExplorerModel: ObservableObject {
         let appDataRoot = self.appDataRoot
         let appGroupRoot = self.appGroupRoot
 
-        // C-8: Use async, not sync, to avoid deadlock when the main
+        // Use async, not sync, to avoid deadlock when the main
         // queue is busy waiting for this background work.
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
 
-            // D-4: Clear any prior cancelled state. The flag is raised by
+            // Clear any prior cancelled state. The flag is raised by
             // DiagnosticsModel cross-tab notification, which fires for
             // any concurrent Run All Diagnostics — if the user then goes
             // *back* to Explorer and taps Refresh, we want the fresh run
@@ -783,12 +751,12 @@ final class FileExplorerModel: ObservableObject {
             self.resetDiscoverCancelled()
             var cancelled = false; // thread-local copy, refreshed periodically
 
-            // ── Phase 1: Quick directory listing — no file reads ──
+            // Phase 1: Quick directory listing — no file reads.
             nonisolated(unsafe) var found: [AppContainer] = []
 
             var dataError: NSError?
             let dataEntries = fileAccess.listDirectory(atPath: appDataRoot, error: &dataError)
-            // CR-13: The previous heuristic (skip only when extension
+            // The previous heuristic (skip only when extension
             // non-empty AND fileSize > 0) let files whose stat failed
             // (fileSize == 0) slip through — e.g. ATX database files
             // like "_ATXDataStore.db" / ".db-shm" that live in the
@@ -798,7 +766,7 @@ final class FileExplorerModel: ObservableObject {
             // blow-up, and tapping them read a multi-MB .db fully into
             // memory.
             //
-            // iOS guarantees container roots contain ONLY directories
+            // iOS guarantees container roots contain only directories
             // named as UUIDs (or systemgroup.* identifiers). So accept
             // an entry only when it is (a) confirmed a directory by
             // stat, or (b) named like a UUID/systemgroup even if stat
@@ -846,42 +814,47 @@ final class FileExplorerModel: ObservableObject {
 
             // Show immediately — user sees the list right away
 
-            // C-8: Use async instead of sync to avoid potential deadlock.
-            // CR-15: snapshot `cancelled` into a let BEFORE the @Sendable
+            // Use async instead of sync to avoid potential deadlock.
+            // snapshot `cancelled` into a let BEFORE the @Sendable
             // closure — capturing the mutable var was a data race (and a
             // hard error under Swift 6 concurrency checking).
             let cancelledNow = cancelled
+
+            // Surface listing errors to the user instead of silently
+            // showing an empty container list.
+            let combinedError: String? = {
+                if cancelledNow { return nil }
+                let dataMsg = dataError?.localizedDescription
+                let groupMsg = groupError?.localizedDescription
+                if dataMsg != nil && groupMsg != nil {
+                    return "\(dataMsg!) ; \(groupMsg!)"
+                }
+                return dataMsg ?? groupMsg
+            }()
+
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.containers = cancelledNow ? [] : found
+                if let combinedError, found.isEmpty {
+                    self.errorMessage = combinedError
+                }
                 self.isLoading = false
             }
 
-            // ── Phase 2: Resolve display names concurrently in background ──
+            // MARK: - Phase 2: Resolve display names concurrently in background
             // Resolve ALL containers (not just the first 50) so that
             // Bundle ID search works across the full list.
             //
-            // M-1 fix: capped concurrency (2) + 5ms inter-operation delay.
-            // Each resolve calls fileAccess.readFile which opens a new
-            // bad_query lease — that's one XPC round-trip and one
-            // sandbox_extension per container. With 200 containers the
-            // naive 8-way concurrent approach issues ~1600 XPC calls in
-            // ~200ms and can exhaust the per-process sandbox_extension
-            // quota (undocumented but ~hundreds), making subsequent
-            // lease acquisitions return -1. We throttle so we still
-            // finish in ~1 second without hitting kernel limits.
+            // Concurrency limit 2 + 5ms spacing: each resolve call opens a new
+            // bad_query lease (one XPC + one sandbox_extension). 8-way concurrency
+            // over 200 containers would emit ~1600 XPC calls in ~200ms, risking
+            // sandbox_extension quota exhaustion. Throttled to ~1s total.
             if cancelled { return }
             let resolveQueue = OperationQueue()
             resolveQueue.maxConcurrentOperationCount = 2
             resolveQueue.qualityOfService = .userInitiated
 
-            // CR-14: BATCHED name updates. The old code applied each
-            // resolved container with its own `Task { @MainActor }` —
-            // for ~200 containers that meant ~200 separate
-            // @Published mutations, each triggering a full SwiftUI List
-            // diff of hundreds of rows → the main thread stayed busy
-            // for the entire Phase-2 window (the "sandbox list feels
-            // frozen while loading" symptom).
+            // Batched name updates to avoid per-container @Published mutations.
             //
             // Now each resolve op only appends to a lock-protected
             // buffer; the polling loop below flushes the buffer to the
@@ -891,7 +864,7 @@ final class FileExplorerModel: ObservableObject {
 
             for (offset, container) in found.enumerated() {
                 resolveQueue.addOperation { [weak self] in
-                    // D-4: Check the cross-tab cancelled flag at the
+                    // Check the cross-tab cancelled flag at the
                     // START of each resolve operation — once Diagnostics
                     // has taken over, we want to stop leaking sandbox
                     // extensions on name resolution, which would otherwise
@@ -925,13 +898,13 @@ final class FileExplorerModel: ObservableObject {
                 }
             }
 
-            // D-4: If a Diagnostics run cancels us while Phase 2 work items
+            // If a Diagnostics run cancels us while Phase 2 work items
             // are still queued, cancel them immediately so we don't issue
             // leases the Diagnostics run needs. OperationQueue.cancelAll
             // doesn't stop already-executing ops, but each op's entry
             // block checks isDiscoverCancelled so we'll drain quickly.
             //
-            // CR-14: the same loop now doubles as the batched-update
+            // the same loop now doubles as the batched-update
             // flusher: every 250 ms it drains the pendingNameUpdates
             // buffer and applies it as ONE main-actor mutation.
             var lastFlushTime = Date().addingTimeInterval(-1)
@@ -977,17 +950,17 @@ final class FileExplorerModel: ObservableObject {
     // MARK: - Directory Browsing
 
     func browseDirectory(at path: String) {
-        // CR-16 v4: browseDirectory's own guard ONLY cares about
+        // browseDirectory's own guard only cares about
         // duplicate-in-flight browse work. Navigation-stack
         // invariant checks (no adjacent equal paths, etc.) are the
-        // SOLE responsibility of the callers that mutate
+        // sole responsibility of the callers that mutate
         // navigationPath (navigateInto / navigateToIndex /
         // enterContainer / enterQuickPath), each of which runs
-        // preFlightBrowseDestination BEFORE mutating the stack.
+        // preFlightBrowseDestination before mutating the stack.
         //
-        // CR-16 v4 ROLLBACK REGIME: Callers are responsible for
+        // Rollback regime: callers are responsible for
         // calling _forceRollbackStalePrePushedNavigation() BEFORE
-        // setting their own marker. browseDirectory MUST NOT call
+        // setting their own marker. browseDirectory must not call
         // it internally — if it did, it would immediately undo the
         // marker the caller just set (navigateInto: .popLast,
         // enterContainer: .resetAll, etc.), which would pop the
@@ -995,11 +968,11 @@ final class FileExplorerModel: ObservableObject {
         // producing the "title matches parent but content shows
         // child" symptom that users reported as infinite nesting.
         guard !path.isEmpty else {
-            gktlLog("[GKTL-Browse] browseDirectory ⚠️ REJECTED empty path (nav=%d)", navigationPath.count)
+            gktlLog("[GKTL-Browse] browseDirectory REJECTED empty path (nav=%d)", navigationPath.count)
             return
         }
         guard !(isLoading && _pendingBrowsePath == path) else {
-            gktlLog("[GKTL-Browse] browseDirectory ⚠️ REJECTED already-loading identical path=%@ (nav=%d)", path, navigationPath.count)
+            gktlLog("[GKTL-Browse] browseDirectory REJECTED already-loading identical path=%@ (nav=%d)", path, navigationPath.count)
             return
         }
 
@@ -1009,7 +982,7 @@ final class FileExplorerModel: ObservableObject {
 
         let fileAccess = self.fileAccess
 
-        // CR-11: Previous implementation dispatched listDirectory to a
+        // Previous implementation dispatched listDirectory to a
         // SECOND nested .userInitiated queue and used a semaphore to wait.
         // That's wasteful (extra thread + semaphore syscall per entry)
         // and more importantly meant the timeout was measuring WAIT TIME
@@ -1036,7 +1009,7 @@ final class FileExplorerModel: ObservableObject {
             guard self._pendingBrowseWorkID == workId else {
                 return
             }
-            gktlLog("[GKTL-Browse] watchdog ⚠️ TIMEOUT path=%@ mine=…%@ matches → rollback after %lldms nav=%d",
+            gktlLog("[GKTL-Browse] watchdog TIMEOUT path=%@ mine=…%@ matches → rollback after %lldms nav=%d",
                   path, workIdShort, timeoutMs, self.navigationPath.count)
             self._pendingBrowseWorkID = nil
             self._applyBrowseResult(path: path, entries: [], error: nil,
@@ -1044,7 +1017,7 @@ final class FileExplorerModel: ObservableObject {
                                     pendingEntry: self.pendingReadOnBrowseFailure)
         }
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        Task.detached(priority: .userInitiated) { [weak self] in
             autoreleasepool {
                 var browseError: NSError?
                 let tListStart = CFAbsoluteTimeGetCurrent()
@@ -1055,13 +1028,13 @@ final class FileExplorerModel: ObservableObject {
                 let listMs = (tListEnd - tListStart) * 1000.0
                 let inCount = entries.count
                 if let e = browseError {
-                    gktlLog("[GKTL-Browse] listDirectory ❌ ERR path=%@ workId=…%@ code=%ld domain=%@ desc=%@ n=%d (%.1fms)",
+                    gktlLog("[GKTL-Browse] listDirectory ERR path=%@ workId=…%@ code=%ld domain=%@ desc=%@ n=%d (%.1fms)",
                           path, workIdShort, Int64(e.code), e.domain, e.localizedDescription, inCount, listMs)
                 } else {
                     // Success — no log (high-frequency normal path).
                 }
 
-                // ISSUE-7 (background-thread empty-dir filter):
+                // (background-thread empty-dir filter):
                 // Run on worker thread BEFORE hopping back to main.
                 // Per-child opendir/readdir is small O(1) work (we
                 // bail after the first non-"."/".." entry), but in
@@ -1079,20 +1052,20 @@ final class FileExplorerModel: ObservableObject {
                 let dropped = inCount - outCount
                 // Only log when notable (dropped > 0 or slow).
                 if dropped > 0 || filtMs > 80.0 {
-                    gktlLog("[GKTL-Browse] empty-dir-filter 🧹 path=%@ workId=…%@ in=%d out=%d dropped=%d (%.1fms%@)",
+                    gktlLog("[GKTL-Browse] empty-dir-filter path=%@ workId=…%@ in=%d out=%d dropped=%d (%.1fms%@)",
                           path, workIdShort, inCount, outCount, dropped, filtMs,
                           filtMs > 400.0 ? " — SLOW (>400ms, consider disabling)" : "")
                 }
 
                 DispatchQueue.main.async {
                     guard let self else {
-                        gktlLog("[GKTL-Browse] completion ⚓️ self already nil → DROP for path=%@ workId=…%@",
+                        gktlLog("[GKTL-Browse] completion self already nil → DROP for path=%@ workId=…%@",
                               path, workIdShort)
                         return
                     }
                     let currentId = self._pendingBrowseWorkID ?? "<nil>"
                     guard self._pendingBrowseWorkID == workId else {
-                        gktlLog("[GKTL-Browse] completion ⚓️ STALE-DROP path=%@ mine=…%@ current=…%@ nav=%d → user navigated away during browse",
+                        gktlLog("[GKTL-Browse] completion STALE-DROP path=%@ mine=…%@ current=…%@ nav=%d → user navigated away during browse",
                               path, workIdShort, String(currentId.suffix(4)), self.navigationPath.count)
                         return
                     }
@@ -1113,7 +1086,7 @@ final class FileExplorerModel: ObservableObject {
     // the final currentEntries/isLoading state. Extracted to avoid
     // duplicating the 3-way fallback logic between the normal path
     // and the timeout watchdog path.
-    // CR-16 v6: Accepts `path` parameter so the handler can populate
+    // Accepts `path` parameter so the handler can populate
     // the entry-cache on success + restore cached parent entries on
     // rollback (never again shows an empty parent listing on nested
     // browse failure — eliminates KeyboardInputScene crash window).
@@ -1123,38 +1096,27 @@ final class FileExplorerModel: ObservableObject {
                                     timedOut: Bool,
                                     workId: String,
                                     pendingEntry: BQFileEntry?) {
-        // ISSUE-6 REVISED (BUGFIX after observing real log):
-        //   Log showed:
-        //     completion ⚓️ ACCEPT workId=…FC38 matches
-        //     apply 🛑 STALE-GUARD-DROP workId mismatch cur=…nil
-        //   i.e. completion's own pre-guard passed, set
-        //   _pendingBrowseWorkID = nil, then called _applyBrowseResult —
-        //   where the STRICT guard `== workId` failed because nil ≠ workId.
-        //   Result: 42 valid entries silently DROPPED, UI stuck loading.
-        //
-        // FIX: accept EITHER nil (already-claimed by caller) OR exact
-        // match. The caller's own strict guard (in browseDirectory's
-        // watchdog / completion blocks) is the real line of defense.
-        // This guard is now redundant-defensive only.
+        // The workId guard accepts nil (already claimed by caller) or an exact
+        // match. The caller's own strict guard in browseDirectory's watchdog /
+        // completion blocks is the real line of defense; this guard is
+        // redundant-defensive only.
         let workIdShort = String(workId.suffix(4))
         let currentId = _pendingBrowseWorkID ?? "<nil>"
         guard _pendingBrowseWorkID == nil || _pendingBrowseWorkID == workId
             else {
-            gktlLog("[GKTL-Browse] apply 🛑 STALE-GUARD-DROP path=%@ workId mismatch mine=…%@ cur=…%@ timedOut=%d err=%d nEntries=%d pendingEntry=%d nav=%d",
+            gktlLog("[GKTL-Browse] apply STALE-GUARD-DROP path=%@ workId mismatch mine=%@ cur=%@ timedOut=%d err=%d nEntries=%d pendingEntry=%d nav=%d",
                   path, workIdShort, String(currentId.suffix(4)), timedOut ? 1 : 0,
                   error != nil ? 1 : 0, entries.count, pendingEntry != nil ? 1 : 0,
                   navigationPath.count)
             return
         }
-        // CR-24: apply ENTER log removed (high-frequency normal path).
-
-        // CR-16: Clear the pending-path guard so subsequent taps work.
+        // Clear the pending-path guard so subsequent taps work.
         _pendingBrowsePath = nil
 
-        // CR-16 FIX 2 + v6 CACHE AWARE:
+        // Cache-aware rollback:
         //   - Rollback nav entries on failure markers as before.
         //   - NEW: after rollback, if navigationPath has a LAST, restore
-        //     currentEntries FROM CACHE for that new (rolled-back) last.
+        //     currentEntries from cache for that new (rolled-back) last.
         //   - If navigationPath is empty, fall back to root listing via
         //     browseDirectory(ROOT) only on cache miss (usually empty).
         //   - Never leave currentEntries = [] when we have a cached
@@ -1173,22 +1135,22 @@ final class FileExplorerModel: ObservableObject {
                     let oldCount = navigationPath.count
                     let removed = navigationPath.last ?? "?"
                     navigationPath.removeLast()
-                    gktlLog("[GKTL-Nav] 🔙 rollback-popLast old=%d new=%d removed=…%@",
+                    gktlLog("[GKTL-Nav] rollback-popLast old=%d new=%d removed=…%@",
                           oldCount, navigationPath.count, String(removed.suffix(24)))
                 }
             case .resetAll:
                 markerDesc = "resetAll"
                 let oldCount = navigationPath.count
                 navigationPath.removeAll()
-                gktlLog("[GKTL-Nav] 🔙 rollback-resetAll old=%d new=0", oldCount)
+                gktlLog("[GKTL-Nav] rollback-resetAll old=%d new=0", oldCount)
             }
             _pendingPrePushedNavigation = .none
             let newNavLen = navigationPath.count
-            gktlLog("[GKTL-Browse] rollback 🔄 marker=%@ navLen %d→%d path=%@ workId=…%@",
+            gktlLog("[GKTL-Browse] rollback marker=%@ navLen %d→%d path=%@ workId=…%@",
                   markerDesc, oldNavLen, newNavLen, path, workIdShort)
-            // CR-16 v6: Rollback is atomic — immediately restore entries
+            // Rollback is atomic — immediately restore entries
             // for the rolled-back-to path from cache. Users see the
-            // PREVIOUS directory content INSTANTLY, no flicker, no
+            // PREVIOUS directory content instantly, no flicker, no
             // re-browse, no blank spinner.
             if let parent = navigationPath.last {
                 let cacheHit = _restoreCachedEntries(for: parent)
@@ -1207,28 +1169,28 @@ final class FileExplorerModel: ObservableObject {
             }
         }
 
-        // CR-16: For pending entries (unknown-type taps), navigationPath
+        // For pending entries (unknown-type taps), navigationPath
         // was NOT pushed before browse. We handle it here:
         //  - Success with entries → push navigation + show entries
-        //  - Success but empty → treat as empty directory (per v5 fix)
+        //  - Success but empty → treat as empty directory ()
         //  - Timeout / error → readFile (was never in nav stack)
         // This eliminates the "child title + parent content" mismatch.
 
         if timedOut {
             if let pending = pendingEntry {
                 pendingReadOnBrowseFailure = nil
-                gktlLog("[GKTL-Browse] timedOut ⏳ PATH=FALLBACK pending=%@ workId=…%@ → readFile",
+                gktlLog("[GKTL-Browse] timedOut PATH=FALLBACK pending=%@ workId=…%@ → readFile",
                       String(pending.fullPath.suffix(28)), workIdShort)
-                // CR-16: navigationPath was never pushed; just read.
+                // navigationPath was never pushed; just read.
                 rollbackPrePushedNavigationIfNeeded()
                 readFile(pending)
                 return
             }
             errorMessage = "Directory listing timed out. The path may be inaccessible."
-            gktlLog("[GKTL-Browse] timedOut ⏳ ERR path=%@ workId=…%@ → rollback+show error", path, workIdShort)
+            gktlLog("[GKTL-Browse] timedOut ERR path=%@ workId=…%@ → rollback+show error", path, workIdShort)
             rollbackPrePushedNavigationIfNeeded()
-            // CR-16 v6: rollback() already restored cached parent entries
-            // (or re-browsed on miss) — NEVER overwrite with []. This
+            // rollback() already restored cached parent entries
+            // (or re-browsed on miss) — never overwrite with []. This
             // was the #1 cause of "infinite nesting" complaints: users
             // returned to parent level but saw zero rows → thought they
             // were in an empty sub-directory → tapped breadcrumbs
@@ -1238,23 +1200,23 @@ final class FileExplorerModel: ObservableObject {
         if let error = error {
             if let pending = pendingEntry {
                 pendingReadOnBrowseFailure = nil
-                gktlLog("[GKTL-Browse] apply-err ❌→readFile pending=%@ err=%@ workId=…%@",
+                gktlLog("[GKTL-Browse] apply-err →readFile pending=%@ err=%@ workId=…%@",
                       String(pending.fullPath.suffix(28)), error.localizedDescription, workIdShort)
-                // CR-16: navigationPath was never pushed; just read.
+                // navigationPath was never pushed; just read.
                 rollbackPrePushedNavigationIfNeeded()
                 readFile(pending)
                 return
             }
             let friendly = ErrorHandler.friendlyMessage(for: error as NSError)
             errorMessage = friendly
-            gktlLog("[GKTL-Browse] apply-err ❌ path=%@ err=%@ (friendly=%@) workId=…%@ → rollback",
+            gktlLog("[GKTL-Browse] apply-err path=%@ err=%@ (friendly=%@) workId=…%@ → rollback",
                   path, error.localizedDescription, friendly, workIdShort)
             rollbackPrePushedNavigationIfNeeded()
-            // CR-16 v6: same note as timedOut branch — rollback restored.
+            // same note as timedOut branch — rollback restored.
             return
         }
         // Success path
-        // CR-16 v4: Removed `currentEntries.isEmpty` guard. The prior
+        // Removed `currentEntries.isEmpty` guard. The prior
         // version only pushed navigation for unknown-type taps when the
         // parent directory was empty, which is wrong — users browse
         // INTO unknown-type entries from NON-EMPTY parent directories
@@ -1265,18 +1227,10 @@ final class FileExplorerModel: ObservableObject {
         // regardless of whether currentEntries is empty.
         if let pending = pendingEntry {
             pendingReadOnBrowseFailure = nil
-            // CR-16 v5: browse succeeded (error==nil, timedOut==false).
-            // Even if entries is empty, treat this as an EMPTY DIRECTORY
-            // rather than falling back to readFile. Reason: calling
-            // listDirectory() on a real FILE nearly always returns an
-            // error such as ENOTDIR — a "successful empty listing" is
-            // the kernel telling us the path is a valid directory that
-            // simply has no children. The old code treated empty
-            // listings as files, so freshly-created empty directories
-            // (or sandbox directories like Library/Caches before the
-            // app writes anything) appeared "un-tappable" — users
-            // reported "clicking the sub-directory does not enter the
-            // next level".
+            // browse succeeded (error==nil, timedOut==false).
+            // Treat empty listings as empty directories, not files.
+            // listDirectory() on a file returns ENOTDIR; a successful empty
+            // listing means a valid directory with no children.
             //
             // File-fallback now happens ONLY in the error/timeout
             // branches above (lines 861-888), where listDirectory
@@ -1284,25 +1238,22 @@ final class FileExplorerModel: ObservableObject {
             let beforeLen = navigationPath.count
             if navigationPath.last != pending.fullPath {
                 navigationPath.append(pending.fullPath)
-                // CR-24: success-pendingEntry logs removed (high-frequency).
             }
         }
-        // CR-16: Entries successfully collected. Clear any rollback
+        // Entries successfully collected. Clear any rollback
         // marker so a subsequent failure (for a LATER browse) doesn't
         // accidentally pop a perfectly-valid navigation entry.
         _pendingPrePushedNavigation = .none
-        // CR-15: defensive dedupe by fullPath before publishing to the
+        // defensive dedupe by fullPath before publishing to the
         // UI. The ObjC layer (bad_query_list_directory) already dedupes
         // APFS snapshot-inode aliases, but any future source of
         // duplicated entries would make ForEach(id: \.fullPath) log
         // "ID occurs multiple times" and render undefined rows — a
         // cheap O(n) pass here makes that impossible.
         //
-        // CR-19 (Duplicate-entry bug, root cause: path normalization):
-        // User reported "目录下方出现了多个同名文件名, 出现重复目录, 里面内容也
-        // 一样". Root cause: previous dedupe used raw `entry.fullPath`
-        // string, but the SAME file can be represented by different
-        // strings:
+        // (Duplicate-entry bug, root cause: path normalization):
+        // User reported duplicate directory entries with identical contents.
+        // Root cause: previous dedupe used raw `entry.fullPath` string,
         //   1. /var/mobile/... vs /private/var/mobile/...  (symlink)
         //   2. /foo/bar vs /foo//bar                       (// collapse)
         //   3. /foo/bar vs /foo/bar/                       (trailing /)
@@ -1317,7 +1268,7 @@ final class FileExplorerModel: ObservableObject {
         var deduped: [BQFileEntry] = []
         deduped.reserveCapacity(entries.count)
         for entry in entries {
-            // CR-19: reuse _normalizePath (CR-21) for consistency.
+            // reuse _normalizePath for consistency.
             // Handles /var vs /private/var, trailing /, case-insensitivity.
             let key = Self._normalizePath(entry.fullPath)
             if seenPaths.insert(key).inserted {
@@ -1330,13 +1281,12 @@ final class FileExplorerModel: ObservableObject {
         }
         let dupsRemoved = entries.count - deduped.count
         if dupsRemoved > 0 {
-            gktlLog("[GKTL-Browse] publish ⚠️ DUPS-REMOVED=%d samples=%@",
+            gktlLog("[GKTL-Browse] publish DUPS-REMOVED=%d samples=%@",
                   dupsRemoved, dupSamples)
         }
-        // CR-25: Check for same-name-different-path entries (user reports
-        // "文件名重复的目录"). This catches the case where two entries have
-        // different fullPath (so dedupe keeps both) but the same display
-        // name — e.g. /Library/Caches and /System/Library/Caches.
+        // Check for same-name-different-path entries. This catches the case
+        // where two entries have different fullPath (so dedupe keeps both)
+        // but the same display name — e.g. /Library/Caches and /System/Library/Caches.
         // These are DIFFERENT directories with the same name — the UI
         // shows them as duplicate-looking rows. Log so we can confirm
         // whether this is the user's complaint.
@@ -1348,47 +1298,43 @@ final class FileExplorerModel: ObservableObject {
         let sameNameDupes = nameMap.filter { $0.value.count > 1 }
         if !sameNameDupes.isEmpty {
             for (name, paths) in sameNameDupes.prefix(3) {
-                gktlLog("[GKTL-Browse] publish ⚠️ SAME-NAME-DIRS name=%@ paths=%@",
+                gktlLog("[GKTL-Browse] publish SAME-NAME-DIRS name=%@ paths=%@",
                       name, paths.map { String($0.suffix(48)) })
             }
         }
-        // CR-16 v6 + CR-26: Cache BEFORE publishing using NORMALIZED
-        // path as key (same as _restoreCachedEntries). This ensures
-        // /var/mobile/Library and /private/var/mobile/Library share
-        // the same cache entry.
-        _entryCache[Self._normalizePath(path)] = deduped
+        // Cache BEFORE publishing using NORMALIZED path as key.
+        // This ensures /var/mobile/Library and /private/var/Library share the same cache entry.
+        let normKey = Self._normalizePath(path)
+        _entryCache[normKey] = deduped
+        _touchCacheKey(normKey)
+        _evictExcessCacheEntries()
         currentEntries = deduped
         pendingReadOnBrowseFailure = nil
         isLoading = false
-        // CR-24: publish 🎉 log removed (high-frequency). DUPS-REMOVED
         // warning above still logs when duplicates are found.
     }
 
     func navigateInto(_ entry: BQFileEntry) {
-        // CR-27: Save scroll position before navigating deeper.
+        // Save scroll position before navigating deeper.
         if let currentDir = navigationPath.last {
             _scrollPositionCache[Self._normalizePath(currentDir)] = scrollRestoreTarget
         }
-        // CR-16 v4 (FIX ALL RACES): navigateInto pushes a directory
-        // onto the nav stack before browse ONLY if browseDirectory
-        // actually accepts the work. Previously we pushed FIRST and
-        // browseDirectory's duplicate-tap guard could RETURN EARLY
-        // without ever calling _applyBrowseResult → the pushed entry
-        // + pre-push marker leaked forever, causing "infinite same-
-        // named directory" stacking.
+        // navigateInto pushes a directory onto the nav stack before browse
+        // only if browseDirectory actually accepts the work. The push must
+        // happen after preFlight acceptance to avoid marker leaks.
         //
-        // CR-16 v4 ORDER:
+        // ORDER:
         //   1. snapshot the target path
         //   2. preFlightBrowseDestination(target) — guard + invariant
-        //      (returns false if browsing this target is NOT accepted,
-        //      in which case we MUST NOT mutate navigationPath)
+        //      (returns false if browsing this target is not accepted,
+        //      in which case we must not mutate navigationPath)
         //   3. _forceRollbackStalePrePushedNavigation — clean up any
         //      stray marker left by a prior cancelled browse so the
         //      NEW marker below is the only active one
         //   4. only THEN push path / set marker / call browse
         let target = entry.fullPath
 
-        // CR-18: BLOCK entry into confirmed-empty directories. Users
+        // Block entry into confirmed-empty directories. Users
         // reported that tapping an empty dir pollutes the breadcrumb
         // trail AND can trigger the "infinite nesting" anomaly when
         // combined with stale markers. Empty dirs contain nothing to
@@ -1396,23 +1342,19 @@ final class FileExplorerModel: ObservableObject {
         // failure (EPERM/…) returns false → navigation proceeds
         // normally (conservative: don't block on uncertain info).
         if _isEmptyDirectory(target) {
-            gktlLog("[GKTL-Browse] navigateInto 🚫 EMPTY-DIR-BLOCK target=…%@ (dir is empty, no entry)",
+            gktlLog("[GKTL-Browse] navigateInto EMPTY-DIR-BLOCK target=…%@ (dir is empty, no entry)",
                   String(target.suffix(28)))
             // Show the user a friendly message instead of silently doing nothing.
             errorMessage = "Directory is empty."
             return
         }
 
-        // CR-21 (fix from CR-20 log analysis — "路径显示还是不对"):
-        // The breadcrumb render log showed a corrupted stack where
-        // SIBLING directories under /private/var/mobile/Library/ were
-        // pushed as if they were nested children of an AppGroup
-        // container:
+        // Fix: corrupted breadcrumb stack where sibling directories were pushed as nested children.
         //
         //   stack: [AppGroup/024C7A15…, Library/Assistant,
         //           Library/BulletinBoard, Library/IdentityServices, …]
-        //   ⚠️ NOT-A-CHILD at every idx ≥ 1
-        //   ⚠️ RAW-DUPES (BulletinBoard appeared twice)
+        //    NOT-A-CHILD at every idx ≥ 1
+        //    RAW-DUPES (BulletinBoard appeared twice)
         //
         // Root cause: navigateInto unconditionally appended `target`
         // to navigationPath WITHOUT verifying that target is actually
@@ -1423,7 +1365,7 @@ final class FileExplorerModel: ObservableObject {
         // relative path. Blindly appending produced a stack with no
         // parent-child relationship between consecutive entries.
         //
-        // FIX: Rebase the stack BEFORE appending so that target is
+        // Rebase the stack before appending so that target is
         // always a truthful child of the new top. Three cases:
         //   (a) target is already in stack → truncate to target
         //       (breadcrumb-like jump, prevents RAW-DUPES)
@@ -1442,7 +1384,7 @@ final class FileExplorerModel: ObservableObject {
         if let existingIdx = newStack.firstIndex(where: { Self._normalizePath($0) == targetNorm }) {
             if existingIdx == newStack.count - 1 {
                 // target is already the current top — nothing to do.
-                gktlLog("[GKTL-Nav] 🚫 navigateInto SKIP target==navTop (already there) target=…%@",
+                gktlLog("[GKTL-Nav] navigateInto SKIP target==navTop (already there) target=…%@",
                       String(target.suffix(24)))
                 return
             }
@@ -1474,7 +1416,7 @@ final class FileExplorerModel: ObservableObject {
                     // Case (c): no ancestor in stack → rebuild a minimal
                     // parent chain so the breadcrumb shows context.
                     //
-                    // CR-23 (breadcrumb optimization): Previously this just
+                    // (breadcrumb optimization): Previously this just
                     // reset to [target], so browsing sibling dirs under
                     // /var/mobile/Library showed only "Assistant" with no
                     // parent context. Now we build a chain of ancestors
@@ -1508,7 +1450,7 @@ final class FileExplorerModel: ObservableObject {
         }
 
         if let reason = rebaseReason {
-            gktlLog("[GKTL-Nav] 🔀 navigateInto-REBASE reason=%@ oldNavLen=%d newNavLen=%d target=…%@",
+            gktlLog("[GKTL-Nav] navigateInto-REBASE reason=%@ oldNavLen=%d newNavLen=%d target=…%@",
                   reason, navigationPath.count, newStack.count, String(target.suffix(24)))
         }
 
@@ -1528,13 +1470,11 @@ final class FileExplorerModel: ObservableObject {
         if navigationPath.last != target {
             navigationPath.append(target)
         }
-        // CR-24: navigateInto ➕ logs removed (high-frequency normal path).
-        // REBASE log above still fires when stack is rebased (non-default).
         _pendingPrePushedNavigation = .popLast(target)
         browseDirectory(at: target)
     }
 
-    // MARK: - Path Normalization Helper (CR-21)
+    // MARK: - Path Normalization Helper
 
     /// Normalizes a filesystem path for comparison purposes.
     /// Handles:
@@ -1544,9 +1484,9 @@ final class FileExplorerModel: ObservableObject {
     ///   - case-insensitivity (iOS default APFS is case-insensitive)
     ///
     /// Used by:
-    ///   - navigateInto (CR-21 stack rebase validation)
-    ///   - handleSearchResultTap (ISSUE-8 truncation)
-    ///   - _applyBrowseResult dedupe (CR-19, future refactor)
+    ///   - navigateInto (stack rebase validation)
+    ///   - handleSearchResultTap
+    ///   - _applyBrowseResult dedupe (future refactor)
     nonisolated static func _normalizePath(_ path: String) -> String {
         var normalized = (path as NSString).standardizingPath
         if normalized.hasPrefix("/private/") {
@@ -1555,23 +1495,19 @@ final class FileExplorerModel: ObservableObject {
         return normalized.lowercased()
     }
 
-    // CR-7: Smart tap handler for entries where isDirectory might be
-    // unknown (because lstat failed — no lease available). Tries to
-    // browse as a directory first; if that yields no entries, falls
-    // back to reading as a file.
+    // Smart tap handler for entries where isDirectory might be unknown
+    // (lstat failed — no lease available). Tries to browse as a directory
+    // first; if that yields no entries, falls back to reading as a file.
     //
-    // CR-16: NAVIGATION STACK SAFETY. The old code unconditionally
-    // pushed entry.fullPath to navigationPath BEFORE browseDirectory
-    // ran — causing the NavigationStack to show the child title while
-    // currentEntries still displayed the PARENT's contents. Users
-    // confused by the mismatch tapped again, producing DUPLICATE
-    // navigation entries ("infinite same-named directories").
+    // Navigation stack safety: never push to navigationPath before browse
+    // confirms the path is a directory. _applyBrowseResult pushes only
+    // when entries are actually returned.
     //
     // New behavior:
     //  1. Known directory → push immediately (safe, we're confident)
     //  2. Known file → readFile immediately (no navigation push)
     //  3. Unknown type → DO NOT push. Browse first; _applyBrowseResult
-    //     pushes navigation ONLY when entries are actually returned,
+    //     pushes navigation only when entries are actually returned,
     //     and falls back to readFile without ever having pushed.
     func handleEntryTap(_ entry: BQFileEntry) {
         // Fast path: we know the type with certainty
@@ -1587,13 +1523,13 @@ final class FileExplorerModel: ObservableObject {
         }
 
         // Unknown type — try browse first, fall back to read
-        // CR-16: DON'T append to navigationPath here. Let
+        // DON'T append to navigationPath here. Let
         // _applyBrowseResult push it only on success.
         // Also: guard against double-tap during in-progress browse.
         if isLoading { return }
-        // CR-16 v4: Clean up any stale marker before browse. The
+        // Clean up any stale marker before browse. The
         // unknown-type path doesn't set its own marker (no pre-push),
-        // but if a PREVIOUS caller left a stray marker, the
+        // but if a previous caller left a stray marker, the
         // rollbackPrePushedNavigationIfNeeded() inside
         // _applyBrowseResult would pop the WRONG entry on failure.
         _forceRollbackStalePrePushedNavigation()
@@ -1608,16 +1544,15 @@ final class FileExplorerModel: ObservableObject {
     /// safety regime (rollback stale markers, no double-push,
     /// browse-first for unknown types).
     ///
-    /// ISSUE-8 (Breadcrumb nesting bug, root-caused via log analysis):
-    //  User-reported symptom: "导航栏上看到的是层级嵌套" — breadcrumb
-    //  showed e.g. `AggregateDictionary > Accounts > AddressBook` for
-    //  three SIBLING directories under /var/mobile/Library. Root cause:
+    /// (Breadcrumb nesting bug, root-caused via log analysis):
+    //  User-reported symptom: breadcrumb showed false nesting (e.g.
+    //  `AggregateDictionary > Accounts > AddressBook`) for three SIBLING
     //  this function unconditionally `navigationPath.append(target)`
     //  for every search-result tap, even when target is a sibling of
-    //  the current top. Predecessor weskVTool had no search-result-tap
+    //  the current top. Previously had no search-result-tap
     //  API at all, so the bug is unique to GestaltKitTool.
     //
-    //  FIX: truncate navigationPath to target's parent (if present),
+    //  Truncate navigationPath to target's parent (if present),
     //  then append target. This keeps breadcrumb truthful:
     //    Library > AggregateDictionary       (search → tap AggregateDictionary)
     //    Library > Accounts                  (search → tap Accounts)
@@ -1629,10 +1564,10 @@ final class FileExplorerModel: ObservableObject {
             // Known directory — push with full safety checks.
             let target = entry.fullPath
 
-            // CR-18: BLOCK entry into confirmed-empty directories from
+            // Block entry into confirmed-empty directories from
             // search results too. Same rationale as navigateInto.
             if _isEmptyDirectory(target) {
-                gktlLog("[GKTL-Browse] searchTap 🚫 EMPTY-DIR-BLOCK target=…%@ (dir is empty, no entry)",
+                gktlLog("[GKTL-Browse] searchTap EMPTY-DIR-BLOCK target=…%@ (dir is empty, no entry)",
                       String(target.suffix(28)))
                 errorMessage = "Directory is empty."
                 return
@@ -1645,7 +1580,7 @@ final class FileExplorerModel: ObservableObject {
             // This produces truthful breadcrumbs: Library > AggregateDictionary
             // (one entry) instead of stacking siblings as fake children.
             //
-            // CR-21: Use _normalizePath for comparison so /var/mobile/Library
+            // Use _normalizePath for comparison so /var/mobile/Library
             // and /private/var/mobile/Library are treated as the same path
             // (iOS symlinks /var → /private/var; fsgetpath may return either).
             var newStack: [String] = navigationPath
@@ -1654,7 +1589,7 @@ final class FileExplorerModel: ObservableObject {
                     // Truncate to include the parent, drop everything after.
                     newStack = Array(newStack.prefix(parentIdx + 1))
                 } else {
-                    // Parent not in stack — CR-23: build parent chain
+                    // Parent not in stack — build parent chain
                     // (same as navigateInto) so breadcrumb shows context.
                     let MAX_PARENT_DEPTH = 3
                     var chain: [String] = []
@@ -1677,12 +1612,11 @@ final class FileExplorerModel: ObservableObject {
                                                   isLoading: isLoading,
                                                   pendingPath: _pendingBrowsePath,
                                                   navigationPath: newStack) else {
-                gktlLog("[GKTL-Browse] searchTap 🚫 preFlight REJECT target=…%@ oldNav=%d newNav=%d",
+                gktlLog("[GKTL-Browse] searchTap preFlight REJECT target=…%@ oldNav=%d newNav=%d",
                       String(target.suffix(28)), navigationPath.count, newStack.count)
                 return
             }
             let oldDepth = navigationPath.count
-            // CR-24: searchTap normal-flow logs removed (high-frequency).
             navigationPath = newStack
             navigationPath.append(target)
             _pendingPrePushedNavigation = .popLast(target)
@@ -1700,33 +1634,32 @@ final class FileExplorerModel: ObservableObject {
         browseDirectory(at: entry.fullPath)
     }
 
-    // CR-7: When handleEntryTap suspects an entry might be a directory,
+    // When handleEntryTap suspects an entry might be a directory,
     // it calls browseDirectory. If browse returns empty/error, this
     // property holds the pending entry so browseDirectory can fall
     // back to readFile.
     var pendingReadOnBrowseFailure: BQFileEntry?
 
-    // CR-11: Nonce for the in-flight browseDirectory call. Used to
+    // Nonce for the in-flight browseDirectory call. Used to
     // discard stale timeout-watchdog / completion callbacks when the
     // user navigates away or taps a different entry while a browse
     // is still running.
     private var _pendingBrowseWorkID: String?
-    // CR-16: Track the path currently being browsed to guard against
+    // Track the path currently being browsed to guard against
     // duplicate taps that would otherwise pollute navigationPath and
     // produce the "infinite same-named directory" symptom.
     private var _pendingBrowsePath: String?
-    // CR-16 (FIX 2): Some call sites (navigateInto, navigateToIndex,
-    // container tap from View) push navigationPath BEFORE calling
+    // Some call sites (navigateInto, navigateToIndex, container tap from View) push navigationPath before calling
     // browseDirectory because they're confident the target is a real
-    // directory. If the browse FAILS (e.g. the target directory does
+    // directory. If the browse fails (e.g. the target directory does
     // not actually exist but stat marked it isDirectory=true via our
-    // heuristic), we must POP the entry we already pushed — otherwise
+    // heuristic), we must pop the entry we already pushed — otherwise
     // the breadcrumb shows a child name while currentEntries still
     // shows the parent's contents, and the user taps again stacking
     // duplicate entries forever.
     //
     // String case: the path that was already pushed onto the nav
-    // stack BEFORE browseDirectory was called. If browse fails or
+    // stack before browseDirectory was called. If browse fails or
     // returns empty and navigationPath.last == this value, we pop.
     //
     // Bool case (true): caller replaced navigationPath wholesale
@@ -1737,7 +1670,7 @@ final class FileExplorerModel: ObservableObject {
     private var _pendingPrePushedNavigation: PrePushedNavigation = .none
 
     func navigateBack() {
-        // CR-15: the toolbar back button renders while
+        // the toolbar back button renders while
         // !navigationPath.isEmpty, but between render and tap an async
         // path (timeout watchdog, error handler, NavigationStack swipe
         // gesture) may already have emptied the array — removeLast()
@@ -1746,13 +1679,12 @@ final class FileExplorerModel: ObservableObject {
         let oldCount = navigationPath.count
         let removed = navigationPath.last ?? "?"
         navigationPath.removeLast()
-        // CR-27: Restore scroll position for the directory we're returning to.
+        // Restore scroll position for the directory we're returning to.
         if let target = navigationPath.last {
             scrollRestoreTarget = _scrollPositionCache[Self._normalizePath(target)]
         }
-        // CR-24: navigateBack normal-flow log removed (high-frequency).
         if let target = navigationPath.last {
-            // CR-16 v6: Prefer cache — O(1) instant restore, 0 XPC.
+            // Prefer cache — O(1) instant restore, 0 XPC.
             // Only fall back to browseDirectory on cache miss. This
             // eliminates 100% of the "tap back → spinner for 3s →
             // timeout → blank" race window that was showing the
@@ -1771,32 +1703,13 @@ final class FileExplorerModel: ObservableObject {
         currentEntries = []
     }
 
-    // —————————————————————————————————————————————————————————————
-    // MARK: - Browse Pre-flight (CR-16 v3)
+    // MARK: - Browse Pre-flight
     //
-    // Invoked BEFORE any caller touches navigationPath. Guards 3
-    // failure modes that previously caused infinite navigation
-    // stacking:
-    //
-    //   1. Duplicate tap while the SAME path is loading → ignore
-    //      (otherwise caller pushes + marker — guard inside
-    //       browseDirectory returns early, rollback never fires).
-    //
-    //   2. Navigation invariant violated: the new target equals
-    //      navigationPath.last → the stack would contain two
-    //      adjacent equal entries. ForEach(id:\.self) inside
-    //      navigationDestination then gets duplicate IDs which
-    //      confuses SwiftUI's diffing and locks the UI into a
-    //      "push again every render" loop.
-    //
+    // Guards against infinite navigation stacking:
+    //   1. Duplicate tap while same path is loading → ignore.
+    //   2. Target equals navigationPath.last → would create duplicate IDs.
     //   3. Navigating to root / empty path → meaningless.
-    //
-    // Also enforces rollback of any STRAY pre-pushed marker left
-    // over from a previous browse whose completion never fired.
-    // Without this, a browse-cancelled-by-new-browse could leave
-    // `_pendingPrePushedNavigation` set for a previous path; the
-    // NEW browse's failure rollback would pop the WRONG entry.
-    // —————————————————————————————————————————————————————————————
+    // Also rolls back stray pre-pushed markers from cancelled browses.
     static private func preFlightBrowseDestination(
         _ target: String,
         isLoading: Bool,
@@ -1804,41 +1717,39 @@ final class FileExplorerModel: ObservableObject {
         navigationPath: [String]
     ) -> Bool {
         if target.isEmpty {
-            gktlLog("[GKTL-Browse] preFlight 🚫 REJECT target=EMPTY isLoading=%d pending=%@ nav=%d",
+            gktlLog("[GKTL-Browse] preFlight REJECT target=EMPTY isLoading=%d pending=%@ nav=%d",
                   isLoading ? 1 : 0, pendingPath ?? "<nil>", navigationPath.count)
             return false
         }
         if isLoading && pendingPath == target {
-            gktlLog("[GKTL-Browse] preFlight 🚫 REJECT target=…%@ reason=ALREADY-LOADING pendingPath matches nav=%d",
+            gktlLog("[GKTL-Browse] preFlight REJECT target=…%@ reason=ALREADY-LOADING pendingPath matches nav=%d",
                   String(target.suffix(28)), navigationPath.count)
             return false
         }
         if let last = navigationPath.last, last == target {
-            gktlLog("[GKTL-Browse] preFlight 🚫 REJECT target=…%@ reason=SAME-AS-NAVLAST nav=%d",
+            gktlLog("[GKTL-Browse] preFlight REJECT target=…%@ reason=SAME-AS-NAVLAST nav=%d",
               String(target.suffix(28)), navigationPath.count)
             return false
         }
-        // CR-24: preFlight ACCEPT log removed (high-frequency).
         return true
     }
 
     /// Navigate to a specific index in the path stack (breadcrumb tap).
     func navigateToIndex(_ index: Int) {
-        // CR-16 v4: Clip the nav stack FIRST to the desired prefix.
+        // Clip the nav stack FIRST to the desired prefix.
         // The preflight checks the CLIPPED state — we are NOT adding
         // a new entry here, only truncating. So the invariant
         // "navPath.last != target" doesn't apply; we skip the
         // standard preflight and call browse directly.
         let oldCount = navigationPath.count
         let truncated = Array(navigationPath.prefix(index + 1))
-        // CR-24: navigateToIndex log removed (high-frequency).
         navigationPath = truncated
-        // CR-27: Restore scroll position for the breadcrumb target.
+        // Restore scroll position for the breadcrumb target.
         if let target = truncated.last {
             scrollRestoreTarget = _scrollPositionCache[Self._normalizePath(target)]
         }
         if let target = truncated.last {
-            // CR-16 v6: FAST PATH — 90% of breadcrumb taps are for
+            // Fast path — 90% of breadcrumb taps are for
             // directories the user has ALREADY browsed. Hit cache first
             // (0 XPC, instant). If hit, no marker is needed — we're
             // atomically jumping to a known-good state.
@@ -1848,7 +1759,7 @@ final class FileExplorerModel: ObservableObject {
                 _forceRollbackStalePrePushedNavigation()
                 return
             }
-            // SLOW PATH — cache miss → need to browse. Proceed with the
+            // Slow path — cache miss → need to browse. Proceed with the
             // marker regime so a FAILURE pops the (now-wrong) truncated
             // last entry and restores the next-parent state.
             guard Self.preFlightBrowseDestination(
@@ -1862,7 +1773,7 @@ final class FileExplorerModel: ObservableObject {
             ) else {
                 return
             }
-            // CR-16 v4: Roll back any stale marker BEFORE setting our
+            // Roll back any stale marker BEFORE setting our
             // own. browseDirectory no longer does this internally, so
             // every marker-setting caller must clean up first.
             _forceRollbackStalePrePushedNavigation()
@@ -1876,13 +1787,12 @@ final class FileExplorerModel: ObservableObject {
     /// Enter a root container from the container list.
     func enterContainer(_ containerPath: String) {
         guard !containerPath.isEmpty else { return }
-        // For container taps we're REPLACING the whole stack → no
+        // For container taps we're replacing the whole stack → no
         // duplicate-with-last check because the stack becomes empty
         // before insertion.
         if isLoading && _pendingBrowsePath == containerPath { return }
         _forceRollbackStalePrePushedNavigation()
         navigationPath = [containerPath]
-        // CR-24: enterContainer log removed (high-frequency).
         _pendingPrePushedNavigation = .resetAll
         browseDirectory(at: containerPath)
     }
@@ -1893,7 +1803,6 @@ final class FileExplorerModel: ObservableObject {
         if isLoading && _pendingBrowsePath == quickPath { return }
         _forceRollbackStalePrePushedNavigation()
         navigationPath = [quickPath]
-        // CR-24: enterQuickPath log removed (high-frequency).
         _pendingPrePushedNavigation = .resetAll
         browseDirectory(at: quickPath)
     }
@@ -1905,7 +1814,7 @@ final class FileExplorerModel: ObservableObject {
     /// called because of guard-return OR the browse silently
     /// dropped its callback). Apply the rollback now to keep the
     /// nav stack honest.
-    /// CR-16 v6: Also atomically restores currentEntries FROM CACHE
+    /// Also atomically restores currentEntries from cache
     /// for the rolled-back-to path, so the listing state never
     /// lags the breadcrumb state by even one render cycle. This is
     /// the final piece needed to eliminate the "nav shows /Library
@@ -1921,17 +1830,17 @@ final class FileExplorerModel: ObservableObject {
                 let oldCount = navigationPath.count
                 let removed = navigationPath.last ?? "?"
                 navigationPath.removeLast()
-                gktlLog("[GKTL-Nav] 🔙 stale-popLast old=%d new=%d removed=…%@ markerExpected=…%@",
+                gktlLog("[GKTL-Nav] stale-popLast old=%d new=%d removed=…%@ markerExpected=…%@",
                       oldCount, navigationPath.count,
                       String(removed.suffix(24)), String(expected.suffix(24)))
             }
         case .resetAll:
             let oldCount = navigationPath.count
             navigationPath.removeAll()
-            gktlLog("[GKTL-Nav] 🔙 stale-resetAll old=%d new=0", oldCount)
+            gktlLog("[GKTL-Nav] stale-resetAll old=%d new=0", oldCount)
         }
         _pendingPrePushedNavigation = .none
-        // CR-16 v6: Post-rollback state sync. Matches the same logic
+        // Post-rollback state sync. Matches the same logic
         // used inline inside rollbackPrePushedNavigationIfNeeded() in
         // _applyBrowseResult.
         if let parent = navigationPath.last {
@@ -1966,7 +1875,7 @@ final class FileExplorerModel: ObservableObject {
             return
         }
 
-        DispatchQueue.global(qos: .userInitiated).async {
+        Task.detached(priority: .userInitiated) {
             do {
                 let data = try fileAccess.readFile(atPath: fullPath)
                 let preview = FilePreview(entry: entry, data: data)
@@ -2003,7 +1912,6 @@ final class FileExplorerModel: ObservableObject {
         }
         guard let rootPath = currentDirectoryPath else { return }
 
-        // H-10: Increment generation to cancel any previous search.
         let gen = nextSearchGeneration()
         isSearching = true
         rawSearchResults = []
@@ -2020,7 +1928,7 @@ final class FileExplorerModel: ObservableObject {
             ? Array(q.utf8).map { $0 | 0x20 }
             : nil
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        Task.detached(priority: .userInitiated) { [weak self] in
             nonisolated(unsafe) var results: [SearchResult] = []
             Self.recursiveSearch(
                 fileAccess: fileAccess,
@@ -2071,7 +1979,6 @@ final class FileExplorerModel: ObservableObject {
             return
         }
 
-        // H-10: Increment generation to cancel any previous search.
         let gen = nextSearchGeneration()
         isSearching = true
         rawSearchResults = []
@@ -2140,7 +2047,7 @@ final class FileExplorerModel: ObservableObject {
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     guard self.searchGeneration == currentGen else { return }
-                    // OPT-C: show growing match count live ("· 142 matches")
+                    // show growing match count live ("· 142 matches")
                     let fmt = String(localized: "Searching %d/%d containers · %lld matches")
                     self.searchProgress = String(format: fmt,
                                                   finishedCount,
@@ -2160,7 +2067,7 @@ final class FileExplorerModel: ObservableObject {
             }
         }
 
-        DispatchQueue.global(qos: .userInitiated).async {
+        Task.detached(priority: .userInitiated) {
             searchQueue.waitUntilAllOperationsAreFinished()
 
             let finalResults = lock.withLock { allResults }
@@ -2214,7 +2121,7 @@ final class FileExplorerModel: ObservableObject {
         let entries = fileAccess.listDirectory(atPath: path, error: &listError)
         if entries.isEmpty { return }
 
-        // CR D-4: If caller gave us a prebuilt ASCII needle, we use the
+        // If caller gave us a prebuilt ASCII needle, we use the
         // allocation-free inline path. Otherwise fall back to Foundation's
         // `localizedCaseInsensitiveContains` once per file name.
         // Using the prebuilt buffer avoids ~10k redundant allocations on
@@ -2469,7 +2376,7 @@ extension Array {
     }
 }
 
-// MARK: - Archive Operations (CR-30 copy-style archive)
+// MARK: - Archive Operations (copy-style archive)
 
 extension FileExplorerModel {
 
@@ -2500,7 +2407,7 @@ extension FileExplorerModel {
             entry.name
         )
         archiveLastMessage = archiveMsg
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        Task.detached(priority: .userInitiated) { [weak self] in
             do {
                 let result = try ArchiveManager.archiveEntry(
                     entry,
@@ -2530,7 +2437,7 @@ extension FileExplorerModel {
     /// Deletes an archive entry by its short name (last path component
     /// shown in the Archive directory listing).
     func deleteArchivedItem(named name: String, completion: ((Result<Void, Error>) -> Void)? = nil) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        Task.detached(priority: .userInitiated) { [weak self] in
             do {
                 try ArchiveManager.deleteArchivedItem(named: name)
                 Task { @MainActor [weak self] in
@@ -2555,7 +2462,7 @@ extension FileExplorerModel {
     /// the Archive quick-path. Called on archive add/remove and once
     /// at init time so the UI has a fresh value.
     func refreshArchiveStats() {
-        DispatchQueue.global(qos: .background).async { [weak self] in
+        Task.detached(priority: .background) { [weak self] in
             guard let entries = try? ArchiveManager.listArchiveEntries() else {
                 Task { @MainActor in
                     self?.archiveStatsCount = 0

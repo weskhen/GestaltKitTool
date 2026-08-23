@@ -2,7 +2,7 @@
 //  BadQueryBridge.h
 //  GestaltKitTool
 //
-//  Path-based ContainerManager query derived from forcequitOS/bad_query.
+//  Path-based ContainerManager query interface.
 //
 
 #import <Foundation/Foundation.h>
@@ -32,5 +32,10 @@ NS_ASSUME_NONNULL_BEGIN
 FOUNDATION_EXPORT NSArray<NSString *> *bad_query_list_directory(NSString *path, int64_t maxInode);
 
 FOUNDATION_EXPORT BOOL BadQueryBridgeAvailable(void);
+
+/// Probe various flag combinations to find one that grants read-write
+/// access on the current iOS build. Diagnostic only — logs results
+/// to NSLog with [GKTL-ObjC] prefix.
+FOUNDATION_EXPORT void BadQueryProbeFlags(NSString *targetPath);
 
 NS_ASSUME_NONNULL_END

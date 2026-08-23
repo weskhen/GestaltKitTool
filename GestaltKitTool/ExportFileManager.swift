@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import os
 
 enum ExportFileManager {
     /// Subdirectory under the system temp folder for GestaltKitTool exports.
@@ -20,14 +21,36 @@ enum ExportFileManager {
 
     /// Writes `data` to a temp file and returns its URL. Cleans up
     /// stale exports older than 1 hour on each call.
-    static func makeExportURL(fileName: String, data: Data) -> URL {
+    ///
+    /// If the write fails, throws so the caller can inform the user
+    /// (e.g. disk full, permission denied).
+    static func makeExportURL(fileName: String, data: Data) throws -> URL {
         cleanOldExports(maxAge: 3600)
-        // Sanitize the file name to prevent path traversal.
         let safeName = fileName
+            .replacingOccurrences(of: "\0", with: "")
             .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "\\", with: "_")
             .replacingOccurrences(of: "..", with: "_")
-        let url = exportDir.appendingPathComponent(safeName)
-        try? data.write(to: url)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let baseName: String
+        if safeName.isEmpty {
+            baseName = "export_\(Int(Date().timeIntervalSince1970))"
+        } else {
+            baseName = (safeName as NSString).lastPathComponent
+        }
+        // Avoid clobbering an existing export with the same name.
+        var url = exportDir.appendingPathComponent(baseName)
+        if FileManager.default.fileExists(atPath: url.path) {
+            let ext = (baseName as NSString).pathExtension
+            let stem = (baseName as NSString).deletingPathExtension
+            var i = 2
+            repeat {
+                let suffix = ext.isEmpty ? "\(stem)_\(i)" : "\(stem)_\(i).\(ext)"
+                url = exportDir.appendingPathComponent(suffix)
+                i += 1
+            } while FileManager.default.fileExists(atPath: url.path)
+        }
+        try data.write(to: url)
         return url
     }
 
@@ -42,7 +65,11 @@ enum ExportFileManager {
         for file in files {
             if let creationDate = try? file.resourceValues(forKeys: [.creationDateKey]).creationDate,
                creationDate < cutoff {
-                try? FileManager.default.removeItem(at: file)
+                do {
+                    try FileManager.default.removeItem(at: file)
+                } catch {
+                    GKTLLog.browse.warning("cleanOldExports: \(error.localizedDescription)")
+                }
             }
         }
     }

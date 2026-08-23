@@ -16,9 +16,24 @@ struct FileExplorerView: View {
     @State private var searchText = ""
     @State private var searchDebounceTask: Task<Void, Never>?
 
-    // C-10: Use a single enum-based sheet manager instead of 4 chained
+    // Use a single enum-based sheet manager instead of 4 chained
     // .sheet(item:) modifiers, which conflict with each other.
     @State private var activeSheet: ExplorerSheet?
+
+    // GestaltKitTool's private container via the AppBackupExporter.
+    @StateObject private var backupManager = AppBackupManager()
+
+    @StateObject private var batchSelection = BatchSelectionModel()
+    @State private var showsBatchDeleteConfirm = false
+    @State private var showsBatchMoveSheet = false
+    @State private var showsBatchProgress = false
+    @StateObject private var batchProgress = BatchOperationProgress()
+    @State private var batchExportURLs: [URL] = []
+    @State private var showsBatchShareSheet = false
+
+    // For each container we first present a "smart categories" page (Documents,
+    // Library, Caches, Preferences, tmp, etc.) before dropping into the raw listing.
+    @State private var selectedContainer: AppContainer?
 
     /// Active confirmation dialog type.
     enum ArchiveAction: Identifiable {
@@ -84,8 +99,8 @@ struct FileExplorerView: View {
             }
             .navigationTitle("Explorer")
             .navigationBarTitleDisplayMode(.large)
-            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: searchTextPrompt)
-            // OPT-C: Scope segmented control — the iOS-standard search
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: Text(searchTextPrompt))
+            // Scope segmented control — the iOS-standard search
             // scope bar rendered directly below the search field text.
             // This replaces the "Auto detect from nav" implicit logic with
             // an explicit user choice that also matches Filza 3.0's "Scope"
@@ -95,7 +110,7 @@ struct FileExplorerView: View {
                     Text(scope.localizedLabel).tag(scope)
                 }
             }
-            // OPT-C: Cancel button — exposed as a navigation bar trailing
+            // Cancel button — exposed as a navigation bar trailing
             // action while search is active so users can abort a long-
             // running cross-container enumeration without having to
             // backspace the query.
@@ -112,8 +127,17 @@ struct FileExplorerView: View {
                         }
                     }
                 }
+                if !model.navigationPath.isEmpty && !batchSelection.isMultiSelectMode {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            batchSelection.enterMultiSelect()
+                        } label: {
+                            Label(String(localized: "Select"), systemImage: "checkmark.circle")
+                        }
+                    }
+                }
             }
-            // OPT-C: Size / Type filter chips — sit just below the search
+            // Size / Type filter chips — sit just below the search
             // bar (using safeAreaInset top so they attach to the nav bar
             // drawing area, not the list content area). Only visible while
             // a search is active; clearing the search hides them.
@@ -131,7 +155,7 @@ struct FileExplorerView: View {
             .onChange(of: searchText) { _, newValue in
                 onSearchTextChange(newValue)
             }
-            // OPT-C: Changing scope while a query is non-empty triggers a
+            // Changing scope while a query is non-empty triggers a
             // fresh recursive search (Auto / All Apps / Current Container
             // all enumerate different directory roots).
             .onChange(of: model.searchScope) { _, _ in
@@ -139,7 +163,7 @@ struct FileExplorerView: View {
                     onSearchTextChange(searchText)
                 }
             }
-            // OPT-C: Changing type or size filters does NOT re-run the
+            // Changing type or size filters does NOT re-run the
             // bad_query directory enumeration. We just post-filter the
             // existing 500-row `rawSearchResults` buffer — essentially
             // instant, zero additional I/O.
@@ -161,6 +185,7 @@ struct FileExplorerView: View {
                         } label: {
                             Image(systemName: "chevron.left")
                         }
+                        .accessibilityLabel(String(localized: "Back"))
                     }
                     // Bookmark button — only shown when browsing a directory
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -172,6 +197,7 @@ struct FileExplorerView: View {
                             Image(systemName: model.isFavorited(path: model.currentDirectoryPath ?? "") ? "bookmark.fill" : "bookmark")
                         }
                         .disabled(model.currentDirectoryPath == nil)
+                        .accessibilityLabel(String(localized: "Toggle Bookmark"))
                     }
                 }
                 if !model.containers.isEmpty || !model.navigationPath.isEmpty {
@@ -181,6 +207,7 @@ struct FileExplorerView: View {
                         } label: {
                             Image(systemName: "arrow.clockwise")
                         }
+                        .accessibilityLabel(String(localized: "Refresh"))
                     }
                 }
             }
@@ -190,7 +217,7 @@ struct FileExplorerView: View {
                 model.discoverContainers()
             }
         }
-        // C-10: Single sheet manager — only one sheet can be presented at a time.
+        // Single sheet manager — only one sheet can be presented at a time.
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .filePreview(let preview):
@@ -202,6 +229,69 @@ struct FileExplorerView: View {
             case .containerDetail(let container):
                 ContainerDetailSheet(container: container)
             }
+        }
+        .sheet(item: $selectedContainer) { container in
+            AppContainerCategoryView(
+                container: container,
+                onBrowsePath: { path in
+                    selectedContainer = nil
+                    enterPath(path)
+                },
+                onBrowseAll: {
+                    let container = container
+                    selectedContainer = nil
+                    enterContainer(container)
+                }
+            )
+        }
+        .sheet(isPresented: $backupManager.isExporting) {
+            AppBackupProgressSheet(progress: backupManager.exportProgress)
+        }
+        .sheet(isPresented: $showsBatchDeleteConfirm) {
+            BatchDeleteConfirmSheet(
+                selectedEntries: selectedBatchEntries,
+                onConfirm: {
+                    showsBatchProgress = true
+                    BatchFileOperations.batchDelete(
+                        entries: selectedBatchEntries,
+                        progress: batchProgress
+                    ) { _ in
+                        showsBatchProgress = false
+                        batchSelection.exitMultiSelect()
+                        if let dir = model.currentDirectoryPath {
+                            model.browseDirectory(at: dir)
+                        }
+                    }
+                }
+            )
+        }
+        .sheet(isPresented: $showsBatchMoveSheet) {
+            BatchMoveDestinationSheet(
+                currentDir: model.currentDirectoryPath ?? "/",
+                onMove: { destination in
+                    showsBatchProgress = true
+                    BatchFileOperations.batchMove(
+                        entries: selectedBatchEntries,
+                        toDestinationDir: destination,
+                        progress: batchProgress
+                    ) { _ in
+                        showsBatchProgress = false
+                        batchSelection.exitMultiSelect()
+                        if let dir = model.currentDirectoryPath {
+                            model.browseDirectory(at: dir)
+                        }
+                    }
+                }
+            )
+        }
+        .sheet(isPresented: $showsBatchProgress) {
+            BatchOperationProgressSheet(
+                progress: batchProgress,
+                title: String(localized: "Batch Operation")
+            ) { _ in }
+        }
+        .sheet(isPresented: $showsBatchShareSheet) {
+            ShareSheet(items: batchExportURLs)
         }
         // Observe model.filePreview and present it via the single sheet manager.
         .onChange(of: model.filePreview) { _, newPreview in
@@ -289,7 +379,7 @@ struct FileExplorerView: View {
         activeSheet = .filePreview(FilePreview(entry: entry, data: data))
     }
 
-    // MARK: - Archive action helpers (CR-30)
+    // MARK: - Archive action helpers ()
 
     @State private var pendingArchiveAction: ArchiveAction?
 
@@ -449,50 +539,58 @@ extension FileExplorerView {
                         }
                     }
                 } header: {
-                    Text(category.rawValue)
+                    Text(category.localizedLabel)
                 }
             }
 
-            // App Sandboxes
+            // App Sandboxes — collapsed into a single push row.
             if searchText.isEmpty {
                 Section {
-                    if model.isLoading && model.containers.isEmpty {
+                    NavigationLink {
+                        AppContainerListView(
+                            model: model,
+                            backupManager: backupManager,
+                            selectedContainer: $selectedContainer,
+                            activeSheet: $activeSheet,
+                            enterContainer: { enterContainer($0) }
+                        )
+                        .environmentObject(model)
+                    } label: {
                         HStack {
-                            ProgressView()
-                            Text("Scanning app containers…")
-                                .foregroundStyle(.secondary)
-                        }
-                    } else if model.containers.isEmpty {
-                        Label("No app containers found.", systemImage: "tray")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(model.containers) { container in
-                            AppContainerRow(container: container) {
-                                enterContainer(container)
-                            } onInfo: {
-                                activeSheet = .containerDetail(container)
+                            Label("App Sandboxes", systemImage: "cube.box.fill")
+                            Spacer()
+                            if model.isLoading && model.containers.isEmpty {
+                                ProgressView()
+                            } else {
+                                Text("\(model.containers.count)")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
                             }
                         }
                     }
-                } header: {
-                    Text("App Sandboxes")
                 } footer: {
-                    Text("Each entry is another app's private data container. bad_query bypasses the sandbox to list and read these directories.")
+                    Text("Browse all app data containers on device. Tap to open the full list with search.")
                 }
             } else if !filteredContainers.isEmpty {
-                // Search results for app containers
+                // Search results for app containers (inline on root)
                 Section {
                     ForEach(filteredContainers) { container in
                         AppContainerRow(container: container) {
-                            enterContainer(container)
+                            selectedContainer = container
                         } onInfo: {
                             activeSheet = .containerDetail(container)
+                        } onBackup: {
+                            backupManager.backupApp(container)
+                        } onBrowseAll: {
+                            enterContainer(container)
                         }
                     }
                 } header: {
                     Text("App Sandboxes")
                 }
             }
+
+            
 
             // Custom Path — hide when searching
             if searchText.isEmpty {
@@ -522,7 +620,7 @@ extension FileExplorerView {
     }
 
     private func enterContainer(_ container: AppContainer) {
-        // CR-16: Use the Model's enterContainer helper so the Model
+        // Use the Model's enterContainer helper so the Model
         // can properly track the pre-pushed navigation state and roll
         // it back if the browse fails (prevents "infinite same-named
         // directory" stacking when a container directory doesn't
@@ -531,7 +629,7 @@ extension FileExplorerView {
     }
 
     private func enterPath(_ path: String) {
-        // CR-16: Same semantics as enterContainer — let the Model own
+        // Same semantics as enterContainer — let the Model own
         // both the nav-stack mutation and any rollback needed on
         // browse failure.
         model.enterQuickPath(path)
@@ -539,9 +637,10 @@ extension FileExplorerView {
 
     // MARK: - Search
 
-    private var searchTextPrompt: String {
+    private var searchTextPrompt: LocalizedStringResource {
         model.navigationPath.isEmpty ? "Search paths & apps" : "Search files"
     }
+
 
     /// Debounced search trigger — waits 300ms after the user stops typing.
     private func onSearchTextChange(_ newValue: String) {
@@ -558,7 +657,7 @@ extension FileExplorerView {
             if newValue.isEmpty { return }
 
             await MainActor.run {
-                // OPT-C: Honour the explicit scope selected by the user
+                // Honour the explicit scope selected by the user
                 // (Filza 3.0 "Scope" selector semantics):
                 //   .auto — fallback to legacy behaviour (empty nav → global,
                 //           non-empty nav → current directory)
@@ -581,7 +680,7 @@ extension FileExplorerView {
         }
     }
 
-    // MARK: - Filter Chips (OPT-C)
+    // MARK: - Filter Chips ()
 
     /// Two segmented menu-style chips for size + type.
     ///
@@ -590,7 +689,7 @@ extension FileExplorerView {
     /// inside its button even with `.labelsHidden()` active, and then
     /// the overlay draws the same caption text a second time, producing
     /// a visible "double UI / ghost text" effect (the user-reported
-    /// "Any Size" and "Any Type"重影).
+    /// "Any Size" and "Any Type" ghost text).
     ///
     /// Instead we wrap the Picker inside a `Menu { } label: { }` so the
     /// Picker becomes a pure content source (it never draws a button of
@@ -831,7 +930,7 @@ extension FileExplorerView {
                 Section {
                     ForEach(model.searchResults) { result in
                         SearchResultRow(result: result, onTap: {
-                            // CR-16 v4: Global-search result taps must go
+                            // Global-search result taps must go
                             // through handleSearchResultTap (not enterPath →
                             // enterQuickPath) because:
                             //   1. Results may be FILES, not directories —
@@ -856,7 +955,7 @@ extension FileExplorerView {
                     HStack {
                         Text("Search Results")
                         Spacer()
-                        // OPT-C: When filters are active, show both the
+                        // When filters are active, show both the
                         // post-filter count and the pre-filter raw count
                         // so users understand "3 shown of 142 matches"
                         // instead of wondering why "cap was 500" they only
@@ -895,6 +994,8 @@ extension FileExplorerView {
                             enterContainer(container)
                         } onInfo: {
                             activeSheet = .containerDetail(container)
+                        } onBackup: {
+                            backupManager.backupApp(container)
                         }
                     }
                 } header: {
@@ -926,9 +1027,15 @@ extension FileExplorerView {
                 Section {
                     HStack {
                         ProgressView()
-                        Text(model.searchProgress.isEmpty ? "Searching…" : model.searchProgress)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        if model.searchProgress.isEmpty {
+                            Text("Searching…")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text(verbatim: model.searchProgress)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -937,12 +1044,12 @@ extension FileExplorerView {
                 Section {
                     ForEach(model.searchResults) { result in
                         SearchResultRow(result: result, onTap: {
-                            // C-11: Defer navigation to avoid mutating state
+                            // Defer navigation to avoid mutating state
                             // during view update. Use Task to schedule after
                             // the current update cycle.
                             let entry = result.entry
                             Task { @MainActor in
-                                // CR-16 v4: Route ALL search-result taps
+                                // Route ALL search-result taps
                                 // through the Model's handleSearchResultTap
                                 // so they receive the full navigation-safety
                                 // regime (preflight, stale-marker rollback,
@@ -1051,7 +1158,7 @@ extension FileExplorerView {
                             FileEntryRow(
                                 entry: entry,
                                 onTap: {
-                                    // CR-7: Use handleEntryTap for smart routing —
+                                    // Use handleEntryTap for smart routing —
                                     // entries where lstat failed (no metadata) might
                                     // be directories. handleEntryTap tries browse
                                     // first and falls back to read if the directory
@@ -1069,10 +1176,15 @@ extension FileExplorerView {
                                     : nil,
                                 onDeleteFromArchive: isBrowsingArchive
                                     ? { pendingArchiveAction = .deleteFromArchive(entry.name) }
+                                    : nil,
+                                isMultiSelectMode: batchSelection.isMultiSelectMode,
+                                isSelected: batchSelection.selectedPaths.contains(entry.fullPath),
+                                onToggleSelect: batchSelection.isMultiSelectMode
+                                    ? { batchSelection.toggle(entry.fullPath) }
                                     : nil
                             )
                             .id(entry.fullPath)
-                            // CR-27: Track the last appeared entry as scroll
+                            // Track the last appeared entry as scroll
                             // restore target. Defer to next runloop to avoid
                             // "Publishing changes from within view updates" warning.
                             .onAppear {
@@ -1085,7 +1197,7 @@ extension FileExplorerView {
                     }
                 }
             }
-            // CR-27: Restore scroll position when currentEntries changes
+            // Restore scroll position when currentEntries changes
             // (e.g. navigateBack cache restore, or new browse result).
             .onChange(of: model.currentEntries) { _, _ in
                 if let target = model.scrollRestoreTarget {
@@ -1097,6 +1209,34 @@ extension FileExplorerView {
                     }
                 }
             }
+            .safeAreaInset(edge: .bottom) {
+                if batchSelection.isMultiSelectMode {
+                    BatchSelectionToolbar(
+                        selectedCount: batchSelection.selectedPaths.count,
+                        onDelete: {
+                            showsBatchDeleteConfirm = true
+                        },
+                        onMove: {
+                            showsBatchMoveSheet = true
+                        },
+                        onExport: {
+                            batchExportURLs = batchSelection.selectedPaths.compactMap { URL(fileURLWithPath: $0) }
+                            if !batchExportURLs.isEmpty {
+                                showsBatchShareSheet = true
+                            }
+                        },
+                        onCancel: {
+                            batchSelection.exitMultiSelect()
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    private var selectedBatchEntries: [BQFileEntry] {
+        model.currentEntries.filter { entry in
+            batchSelection.selectedPaths.contains(entry.fullPath)
         }
     }
 }
@@ -1285,23 +1425,22 @@ private struct BreadcrumbView: View {
             }
             .padding(.vertical, 2)
         }
-        // CR-24: Breadcrumb RENDER log removed (high-frequency).
         // Only keep automated anomaly diagnostics (NOT-A-CHILD, etc.)
         .onChange(of: pathStack) { _, newStack in
-            // CR-20 diagnostics: catch impossible-looking breadcrumbs
+            // diagnostics: catch impossible-looking breadcrumbs
             // (e.g. duplicates, a parent path that isn't a prefix of
             // the next child, empty entries). These are tell-tale
             // signs of a corrupted navigationPath.
             for i in 0..<newStack.count {
                 let path = newStack[i]
                 if path.isEmpty {
-                    gktlLog("[GKTL-CRUMB] ⚠️ EMPTY-ENTRY at index=%d", i)
+                    gktlLog("[GKTL-CRUMB] EMPTY-ENTRY at index=%d", i)
                 }
                 if i > 0 {
                     let parent = newStack[i-1]
                     let expectedPrefix = parent + "/"
                     if !path.hasPrefix(expectedPrefix) && path != parent {
-                        gktlLog("[GKTL-CRUMB] ⚠️ NOT-A-CHILD idx=%d: parent=…%@ NOT prefix of child=…%@",
+                        gktlLog("[GKTL-CRUMB] NOT-A-CHILD idx=%d: parent=…%@ NOT prefix of child=…%@",
                               i,
                               String(parent.suffix(36)),
                               String(path.suffix(36)))
@@ -1310,7 +1449,7 @@ private struct BreadcrumbView: View {
             }
             let unique = Set(newStack)
             if unique.count != newStack.count {
-                gktlLog("[GKTL-CRUMB] ⚠️ RAW-DUPES unique=%d vs stack=%d",
+                gktlLog("[GKTL-CRUMB] RAW-DUPES unique=%d vs stack=%d",
                       unique.count, newStack.count)
             }
         }
@@ -1363,6 +1502,9 @@ private struct AppContainerRow: View {
     let container: AppContainer
     let onTap: () -> Void
     let onInfo: () -> Void
+    var onBackup: (() -> Void)? = nil
+    // enters the container root directly (long-press shortcut).
+    var onBrowseAll: (() -> Void)? = nil
 
     var body: some View {
         Button(action: onTap) {
@@ -1407,6 +1549,96 @@ private struct AppContainerRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if let onBrowseAll {
+                Button {
+                    onBrowseAll()
+                } label: {
+                    Label(String(localized: "Browse All Files"), systemImage: "folder.badchevron")
+                }
+            }
+            if let onBackup {
+                Button {
+                    onBackup()
+                } label: {
+                    Label(String(localized: "Back Up Container"), systemImage: "arrow.down.doc")
+                }
+            }
+        }
+    }
+}
+
+// MARK: - App Container List View
+//
+// Dedicated full-screen list for browsing all app containers.
+// Previously inlined ~200 rows in the Explorer root page, making
+// scrolling unpleasant. Now collapsed into a single NavigationLink
+// on the root and pushed to this view, which has its own search bar
+// and preserves the same smart-category sheet flow.
+
+struct AppContainerListView: View {
+    @ObservedObject var model: FileExplorerModel
+    @ObservedObject var backupManager: AppBackupManager
+    @Binding var selectedContainer: AppContainer?
+    @Binding var activeSheet: FileExplorerView.ExplorerSheet?
+    let enterContainer: (AppContainer) -> Void
+
+    @State private var searchText = ""
+
+    /// Filtered containers based on local search.
+    private var filteredContainers: [AppContainer] {
+        guard !searchText.isEmpty else { return model.containers }
+        return model.containers.filter { c in
+            c.displayName.localizedCaseInsensitiveContains(searchText) ||
+            (c.bundleIdentifier?.localizedCaseInsensitiveContains(searchText) ?? false) ||
+            c.id.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
+    var body: some View {
+        List {
+            if model.isLoading && model.containers.isEmpty {
+                Section {
+                    HStack {
+                        ProgressView()
+                        Text(String(localized: "Scanning app containers…"))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else if filteredContainers.isEmpty && !model.containers.isEmpty {
+                Section {
+                    Label(String(localized: "No matching containers."), systemImage: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Section {
+                    ForEach(filteredContainers) { container in
+                        AppContainerRow(container: container) {
+                            selectedContainer = container
+                        } onInfo: {
+                            activeSheet = .containerDetail(container)
+                        } onBackup: {
+                            backupManager.backupApp(container)
+                        } onBrowseAll: {
+                            enterContainer(container)
+                        }
+                    }
+                } header: {
+                    HStack {
+                        Text(String(localized: "App Sandboxes"))
+                        Spacer()
+                        Text("\(filteredContainers.count)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } footer: {
+                    Text(String(localized: "Each entry is another app's private data container. bad_query bypasses the sandbox to list and read these directories."))
+                }
+            }
+        }
+        .navigationTitle(String(localized: "App Sandboxes"))
+        .navigationBarTitleDisplayMode(.large)
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: String(localized: "Filter by name or bundle ID"))
     }
 }
 
@@ -1481,10 +1713,25 @@ private struct FileEntryRow: View {
     var onArchive: (() -> Void)? = nil
     var onRestoreFromArchive: (() -> Void)? = nil
     var onDeleteFromArchive: (() -> Void)? = nil
+    var isMultiSelectMode: Bool = false
+    var isSelected: Bool = false
+    var onToggleSelect: (() -> Void)? = nil
 
     var body: some View {
-        Button(action: onTap) {
+        Button(action: {
+            if isMultiSelectMode, let onToggleSelect {
+                onToggleSelect()
+            } else {
+                onTap()
+            }
+        }) {
             HStack(spacing: 10) {
+                if isMultiSelectMode {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                }
+
                 Image(systemName: entry.isDirectory ? "folder.fill" : fileIcon)
                     .font(.body)
                     .foregroundStyle(entry.isDirectory ? Color.accentColor : fileColor)
@@ -1574,6 +1821,7 @@ private struct FilePreviewSheet: View {
     let preview: FilePreview
     @State private var displayMode: DisplayMode = .auto
     @State private var exportedFileURL: URL?
+    @State private var exportError: String?
 
     enum DisplayMode: String, CaseIterable {
         case auto, parsed, text, hex
@@ -1616,11 +1864,19 @@ private struct FilePreviewSheet: View {
             }
             .task {
                 guard exportedFileURL == nil else { return }
-                let url = ExportFileManager.makeExportURL(
-                    fileName: preview.entry.name,
-                    data: preview.data
-                )
-                exportedFileURL = url
+                do {
+                    let url = try ExportFileManager.makeExportURL(
+                        fileName: preview.entry.name,
+                        data: preview.data
+                    )
+                    exportedFileURL = url
+                } catch {
+                    exportError = error.localizedDescription
+                }
+            }
+            if let exportError {
+                InlineErrorBanner(message: exportError)
+                    .padding(.horizontal)
             }
         }
     }
@@ -1694,7 +1950,7 @@ private struct FilePreviewSheet: View {
                 Image(systemName: "cylinder.split.1x2.fill")
                     .font(.largeTitle)
                     .foregroundStyle(.brown)
-                Text("SQLite database — binary content shown in hex mode.")
+                Text(String(localized: "SQLite database — binary content shown in hex mode."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1713,7 +1969,7 @@ private struct FilePreviewSheet: View {
             if let dict = preview.plistDictionary {
                 PlistDisplayView(dict: dict)
             } else {
-                Text("Unable to parse as property list.")
+                Text(String(localized: "Unable to parse as property list."))
                     .foregroundStyle(.secondary)
             }
         case .json:
@@ -1723,19 +1979,19 @@ private struct FilePreviewSheet: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                Text("Unable to parse as JSON.")
+                Text(String(localized: "Unable to parse as JSON."))
                     .foregroundStyle(.secondary)
             }
         case .image:
             imageDisplay
         default:
-            Text("No structured view available for this file type.")
+            Text(String(localized: "No structured view available for this file type."))
                 .foregroundStyle(.secondary)
         }
     }
 
     private var textDisplay: some View {
-        Text(preview.textPreview ?? "[Unable to decode as text]")
+        Text(preview.textPreview ?? String(localized: "(Unable to decode as text)"))
             .font(.system(.caption, design: .monospaced))
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1785,9 +2041,15 @@ private struct FileDetailSheet: View {
                                 .font(.headline)
                                 .lineLimit(2)
                                 .truncationMode(.middle)
-                            Text(entry.isDirectory ? "Directory" : "File")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                            if entry.isDirectory {
+                                Text("Directory")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("File")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                         Spacer()
                     }
@@ -1806,7 +2068,11 @@ private struct FileDetailSheet: View {
                 // Metadata
                 Section("Metadata") {
                     LabeledContent("Type") {
-                        Text(entry.isDirectory ? "Directory" : fileTypeLabel)
+                        if entry.isDirectory {
+                            Text("Directory")
+                        } else {
+                            Text(verbatim: fileTypeLabel)
+                        }
                     }
                     if !entry.isDirectory {
                         LabeledContent("Size") {
@@ -1927,7 +2193,7 @@ private struct QuickPathDetailSheet: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(quickPath.name)
                                 .font(.headline)
-                            Text(quickPath.category.rawValue)
+                            Text(quickPath.category.localizedLabel)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -2050,6 +2316,133 @@ private struct ContainerDetailSheet: View {
             return String(localized: "A shared app group container. Used by apps and extensions that belong to the same group to share data. Contains shared Documents, Library, and other directories accessible to all group members.")
         case .shared:
             return String(localized: "A shared container accessible by multiple apps or system services.")
+        }
+    }
+}
+
+// MARK: - App Container Category View
+
+/// Smart categories sheet shown when the user taps an app container.
+/// Presents quick-access links to common subdirectories (Documents,
+/// Library, Caches, Preferences, tmp) before dropping into the raw
+/// directory listing.
+struct AppContainerCategoryView: View {
+    @Environment(\.dismiss) private var dismiss
+    let container: AppContainer
+    let onBrowsePath: (String) -> Void
+    let onBrowseAll: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                // Header
+                Section {
+                    HStack(spacing: 14) {
+                        Image(systemName: container.containerType == .appGroup ? "square.stack.3d.up" : "app.fill")
+                            .font(.system(size: 40))
+                            .foregroundStyle(Color.accentColor)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(container.displayName)
+                                .font(.headline)
+                                .lineLimit(2)
+                                .truncationMode(.middle)
+                            if let bundleId = container.bundleIdentifier {
+                                Text(bundleId)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                                    .truncationMode(.middle)
+                            }
+                            Text(container.containerType == .appGroup
+                                 ? String(localized: "App Group Container")
+                                 : String(localized: "App Data Container"))
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                // Quick Access — only for data containers
+                if container.containerType == .data {
+                    Section(String(localized: "Quick Access")) {
+                        quickLink(icon: "doc.text.fill", title: String(localized: "Documents"), path: container.path + "/Documents")
+                        quickLink(icon: "gearshape.fill", title: String(localized: "Library"), path: container.path + "/Library")
+                        quickLink(icon: "tray.fill", title: String(localized: "Caches"), path: container.path + "/Library/Caches")
+                        quickLink(icon: "doc.text.magnifyingglass", title: String(localized: "Preferences"), path: container.path + "/Library/Preferences")
+                        quickLink(icon: "externaldrive.fill", title: String(localized: "tmp"), path: container.path + "/tmp")
+                    }
+                }
+
+                // Container root
+                Section(String(localized: "Container")) {
+                    quickLink(icon: "folder.fill", title: String(localized: "Container Root"), path: container.path)
+                }
+
+                // Browse All Files
+                Section {
+                    Button {
+                        dismiss()
+                        onBrowseAll()
+                    } label: {
+                        Label(String(localized: "Browse All Files"), systemImage: "folder.badchevron")
+                            .foregroundStyle(Color.accentColor)
+                    }
+                }
+            }
+            .navigationTitle(container.displayName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(String(localized: "Done")) {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private func quickLink(icon: String, title: String, path: String) -> some View {
+        Button {
+            dismiss()
+            onBrowsePath(path)
+        } label: {
+            Label(title, systemImage: icon)
+                .foregroundStyle(.primary)
+        }
+        .accessibilityLabel(title)
+    }
+}
+
+// MARK: - App Backup Progress Sheet
+
+/// Presents live progress of an app container backup operation.
+/// Wraps `ExportProgressView` from AppBackupExporter in a navigation
+/// stack with a dismiss button.
+private struct AppBackupProgressSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let progress: ExportProgress
+
+    var body: some View {
+        NavigationStack {
+            VStack {
+                ExportProgressView(progress: progress)
+                    .padding()
+                Spacer()
+            }
+            .navigationTitle(String(localized: "Backing Up"))
+            .navigationBarTitleDisplayMode(.inline)
+            .interactiveDismissDisabled(!progress.isComplete)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(String(localized: "Done")) {
+                        dismiss()
+                    }
+                    .disabled(!progress.isComplete)
+                }
+            }
         }
     }
 }
