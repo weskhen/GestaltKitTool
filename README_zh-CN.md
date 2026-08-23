@@ -68,7 +68,7 @@ Apple 可能随时更改这些私有行为。
 ```sh
 xcodebuild \
   -project GestaltKitTool.xcodeproj \
-  -scheme WeskTool \
+  -scheme GestaltKitTool \
   -configuration Release \
   -destination 'generic/platform=iOS' \
   DEVELOPMENT_TEAM=YOUR_TEAM_ID \
@@ -80,7 +80,7 @@ xcodebuild \
 ```sh
 xcodebuild \
   -project GestaltKitTool.xcodeproj \
-  -scheme WeskTool \
+  -scheme GestaltKitTool \
   -sdk iphoneos \
   -destination 'generic/platform=iOS' \
   CODE_SIGNING_ALLOWED=NO \
@@ -88,7 +88,7 @@ xcodebuild \
   build
 ```
 
-> **Scheme 名称说明**：Xcode Scheme 仍使用 `WeskTool`，以保持 `SWIFT_OBJC_BRIDGING_HEADER` 路径、target UUID、`TEST_HOST` 引用内部稳定。本次仅修改了显示的产品名（`PRODUCT_NAME` / `CFBundleDisplayName`）及工程文件名。
+> **更名说明**：Xcode Scheme、Target 名、Bridging Header、`TEST_HOST` 均已全部改为 `GestaltKitTool`。仅保留两处旧名：Bundle identifier（`com.wesk.vtool`，保证已安装 App 原地升级）与一个源文件 `WeskToolEnhancements.swift`（历史命名，不影响编译）。
 
 IPA 文件、证书、Provisioning Profile、开发团队标识符、本地 Xcode 用户数据均排除在仓库之外。
 

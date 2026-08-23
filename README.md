@@ -68,7 +68,7 @@ Open `GestaltKitTool.xcodeproj` in Xcode, select your development team for the t
 ```sh
 xcodebuild \
   -project GestaltKitTool.xcodeproj \
-  -scheme WeskTool \
+  -scheme GestaltKitTool \
   -configuration Release \
   -destination 'generic/platform=iOS' \
   DEVELOPMENT_TEAM=YOUR_TEAM_ID \
@@ -80,7 +80,7 @@ Validate source without signing:
 ```sh
 xcodebuild \
   -project GestaltKitTool.xcodeproj \
-  -scheme WeskTool \
+  -scheme GestaltKitTool \
   -sdk iphoneos \
   -destination 'generic/platform=iOS' \
   CODE_SIGNING_ALLOWED=NO \
@@ -88,7 +88,7 @@ xcodebuild \
   build
 ```
 
-> **Scheme name note**: The Xcode scheme is still called `WeskTool` to keep `SWIFT_OBJC_BRIDGING_HEADER` paths, target UUIDs, and `TEST_HOST` references internally stable. Only the displayed product name (`PRODUCT_NAME` / `CFBundleDisplayName`) and project file name were renamed.
+> **Renaming note**: Xcode scheme, target name, bridging header, and `TEST_HOST` have all been renamed to `GestaltKitTool`. Only the bundle identifier (`com.wesk.vtool`) and one source file (`WeskToolEnhancements.swift`) keep the former project name — the former preserves in-place upgrades for existing installations, the latter is a historical filename with no build impact.
 
 IPA files, certificates, provisioning profiles, development team identifiers, and local Xcode user data are excluded from the repository.
 
