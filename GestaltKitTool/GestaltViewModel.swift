@@ -204,6 +204,16 @@ final class GestaltViewModel: ObservableObject {
             } else if id == .disableLiquidGlassLowPerformance {
                 selectedTweaks.remove(.enableLiquidGlassLowPerformance)
             }
+            // iPadOS Mode conflicts with iPad-app compatibility mode:
+            // running iPad apps in compatibility mode overrides the
+            // "device is an iPad" identity decision, breaking multi-window
+            // and other iPadOS features. Make them mutually exclusive.
+            if id == .iPadOS {
+                selectedTweaks.remove(.iPadApps)
+                selectedTweaks.remove(.stageManager)
+            } else if id == .iPadApps || id == .stageManager {
+                selectedTweaks.remove(.iPadOS)
+            }
         } else {
             selectedTweaks.remove(id)
         }
@@ -230,6 +240,17 @@ final class GestaltViewModel: ObservableObject {
             for id in tweaksToRevert {
                 guard let definition = GestaltTweakCatalog.definition(for: id) else { continue }
                 pending.revert(definition: definition)
+            }
+
+            // --- Enforce iPadOS-mode exclusivity ---
+            // If iPadOS mode is being applied, "Allow iPad Apps" must be
+            // disabled: the compatibility-mode array [1,2] makes the system
+            // treat iPad identity as a compatibility fallback, which breaks
+            // multi-window. Defensive: applies even if the stale plist
+            // already contains both.
+            if selectedTweaks.contains(.iPadOS),
+               let iPadAppsDef = GestaltTweakCatalog.definition(for: .iPadApps) {
+                pending.revert(definition: iPadAppsDef)
             }
 
             // --- Apply newly selected tweaks ---

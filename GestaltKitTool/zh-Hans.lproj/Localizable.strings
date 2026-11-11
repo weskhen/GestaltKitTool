@@ -33,8 +33,7 @@
 "Full plist snapshot" = "整机快照";
 "Field-level patches" = "字段补丁";
 "A backup is a full snapshot of this device's MobileGestalt plist, including device-identity fields. Use it to roll back before risky changes. Do not share across devices — restoring it on another device would overwrite its identity." = "备份是本机 MobileGestalt plist 的完整快照，包含设备身份字段。用于风险操作前的回滚。请勿跨设备分享——在另一台设备上恢复会覆盖其身份字段。";
-"A patch is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "补丁是设备无关的 CacheExtra 字段集合，合并到当前 plist，不触碰设备身份。可跨设备分享，用于传播 tweak 组合。";
-
+"A patch is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "补丁是设备无关的 CacheExtra 字段集合，会合并到当前 plist，不触碰设备身份。可跨设备分享，适合传播 tweak 组合。";
 
 "Search key or value" = "搜索键或值";
 "Add CacheExtra Field" = "新增 CacheExtra 字段";
@@ -98,7 +97,7 @@
 "Marks the device as supporting Stage Manager." = "标记设备支持台前调度。";
 "Enables iPad app compatibility types on iPhone." = "在 iPhone 上开放 iPad App 兼容类型。";
 "Enable iPadOS Mode" = "启用 iPadOS 模式";
-"Changes five capabilities and CacheData; experimental and high risk." = "同时修改五项能力与 CacheData；此功能为实验性且风险较高。";
+"Changes five capabilities and CacheData; experimental and high risk. Mutually exclusive with \"Allow iPad Apps\" and \"Stage Manager Support\" — enabling one disables the others." = "同时修改五项能力与 CacheData；实验性、高风险。与\"允许 iPad 应用\"和\"Stage Manager 支持\"互斥，启用一项会自动关闭其余项。";
 "Enables internal capabilities such as Metal HUD; some services may misbehave." = "开放 Metal HUD 等内部能力；部分系统服务可能异常。";
 "Shows internal files in Storage settings; high risk on some iPads." = "在储存空间设置中显示内部文件；部分 iPad 风险较高。";
 "Marks the device as a Security Research Device." = "将设备标记为安全研究设备。";
@@ -175,17 +174,17 @@
 "XML" = "XML";
 "Dynamic Library" = "动态库";
 "Framework Bundle" = "框架包";
-"A directory (folder). Tap to navigate into it and view its contents." = "目录（文件夹）。点击可进入并查看其内容。";
-"An Apple property list file. Contains structured key-value data, typically used for application settings, preferences, and configuration. Can be in binary or XML format." = "Apple 属性列表文件。二进制或 XML 格式。存放设置、偏好、配置等键值数据。";
-"A JSON (JavaScript Object Notation) data file. Contains structured data in a human-readable text format, commonly used for app data export, API responses, and configuration." = "JSON 文件。纯文本。用于导出、API 响应、配置。";
-"An SQLite database file. Contains structured data in tables, indexes, and schemas. May store app data, caches, or metadata. Binary format — view in hex mode for raw inspection." = "SQLite 数据库。表、索引、模式。二进制——可用十六进制模式查看。";
-"A plain text file. Contains unformatted text data, readable directly. May include logs, notes, or configuration data." = "纯文本文件。未格式化文本，可直接读取。";
-"A log file. Contains timestamped application or system events, useful for debugging and diagnostics. Plain text format." = "日志文件。带时间戳的事件。纯文本。";
-"An image file. Contains raster graphics data. Can be previewed directly in the file viewer. Common formats include PNG, JPEG, and HEIC (Apple's high-efficiency format)." = "图片文件。PNG / JPEG / HEIC。支持预览。";
-"An XML (eXtensible Markup Language) file. Contains structured text data with tags, used for configuration, data interchange, and property lists in text format." = "XML 文件。标签文本格式。用于配置、交换、文本 plist。";
-"A dynamic library (shared object). Contains compiled machine code loaded at runtime. Binary format — view in hex mode for raw inspection." = "动态库（共享对象）。编译机器码，运行时加载。二进制——可用十六进制模式查看。";
-"A framework bundle directory. Contains a dynamic library and associated resources (headers, plists). Tap to browse its contents." = "框架包。动态库 + 资源（头文件、plist）。点击浏览。";
-"A file in the device filesystem. Tap to preview its contents. The file type is not specifically recognized — it may be shown as text or binary data." = "未知文件类型。点击预览——显示为文本或二进制。";
+"Directory. Tap to open it." = "目录。点击进入。";
+"Key-value configuration file, in binary or XML format. Commonly stores app settings and preferences." = "键值配置文件，二进制或 XML 格式，常用于存储应用设置与偏好。";
+"Structured text data. Commonly used for app data export, API responses, and configuration." = "结构化文本数据，常用于应用数据导出、API 响应和配置。";
+"SQLite database. Tap to browse its tables; view raw bytes in hex mode." = "SQLite 数据库。点击可浏览表，十六进制模式可查看原始字节。";
+"Plain text file — logs, notes, or configuration." = "纯文本文件，如日志、笔记或配置。";
+"Plain text log with timestamped events; useful for diagnostics." = "带时间戳事件的纯文本日志，用于诊断。";
+"Image file (PNG / JPEG / HEIC). Preview directly in the viewer." = "图片文件（PNG / JPEG / HEIC），可在查看器中直接预览。";
+"Tagged text format used for configuration, data interchange, and text plists." = "带标签的文本格式，用于配置、数据交换和文本 plist。";
+"Compiled shared library loaded at runtime. View raw bytes in hex mode." = "运行时加载的编译共享库，十六进制模式可查看原始字节。";
+"Bundle containing a dynamic library and its resources. Tap to browse." = "包含动态库及其资源的包目录，点击浏览。";
+"Tap to preview. Unrecognized types are shown as text or hex." = "点击预览。未识别的类型以文本或十六进制显示。";
 
 /* System Inspector */
 "These files contain sensitive system data. Reading them demonstrates the full impact of bad_query sandbox escape." = "这些文件包含敏感系统数据。读取它们展示了 bad_query 沙盒逃逸的完整影响。";
@@ -465,7 +464,7 @@
 /* 共享配置 */
 "Shared Profiles" = "共享配置";
 "Field-level configs" = "字段级配置";
-"A shared profile is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "共享配置是设备无关的 CacheExtra 字段集合，合并到当前 plist，不触碰设备身份。可跨设备分享，用于传播 tweak 组合。";
+"A shared profile is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "共享配置是设备无关的 CacheExtra 字段集合，会合并到当前 plist，不触碰设备身份。可跨设备分享，适合传播调整组合。";
 "Import Patch" = "导入补丁";
 "Export Patch…" = "导出补丁…";
 "A patch contains only the CacheExtra fields the author chose to share. Importing applies it on top of the current plist and writes immediately. Export packages applied tweaks or hand-picked fields into a shareable .weskpatch." = "补丁仅包含作者选择分享的 CacheExtra 字段。导入时会叠加到当前 plist 并立即写入。导出时将已应用的调整项或手动选择的字段打包为可分享的 .weskpatch 文件。";
@@ -611,13 +610,12 @@
 /* SafeCleanup */
 "Clean" = "清理";
 "Nothing to Clean" = "无需清理";
-"No app cache or temporary files were found. Your device is already clean." = "未找到应用缓存或临时文件。";
+"No app cache or temporary files were found. Your device is already clean." = "未找到应用缓存或临时文件。你的设备已经很干净了。";
 "Rescan" = "重新扫描";
 "Total Cleanable" = "可清理总量";
 "apps" = "个应用";
 "Apps with Cache" = "有缓存的应用";
 "Summary" = "概要";
-"Safe Cleanup only removes Library/Caches and tmp/ directories. Your app data, documents, and preferences are never touched." = "安全清理仅删除 Library/Caches 和 tmp/ 目录。你的应用数据、文档和偏好设置不会被触碰。";
 "Apps" = "应用";
 "Clear Selection" = "清除选择";
 "Cleanup Complete" = "清理完成";
@@ -653,7 +651,7 @@
 "Cancelled" = "已取消";
 
 /* 系统支持消息 */
-"GestaltKitTool currently supports iOS 26.0–26.6.1 and iOS 27 beta 1–4." = "GestaltKitTool 目前支持 iOS 26.0–26.6.1 和 iOS 27 beta 1–4。";
+"GestaltKitTool currently supports iOS 26.0–26.7.2 and iOS 27 beta 1–4 / 27.2 / 27.3 beta." = "GestaltKitTool 目前支持 iOS 26.0–26.7.2 和 iOS 27 beta 1–4 / 27.2 / 27.3 beta。";
 
 /* 已应用调整项预设描述 */
 "The applied-tweaks preset selects every CacheExtra key referenced by a tweak toggle that is currently ON. You can also manually browse and pick arbitrary keys below." = "已应用调整项预设会选择每个当前开启的调整项所引用的 CacheExtra 键。你也可以在下方手动浏览和选择任意键。";
@@ -764,7 +762,7 @@
 "A backup is created automatically before each write. You can also create manual backups from the Backups screen." = "每次写入前会自动创建备份。您也可以从备份页面手动创建备份。";
 "Changes are applied immediately. After writing, the device will respring (restart SpringBoard) for changes to take effect." = "更改将立即应用。写入后，设备将注销（重启 SpringBoard）以使更改生效。";
 "Some changes (e.g. enabling iPadOS mode) are difficult to reverse and may require restoring from a backup." = "某些更改（如启用 iPadOS 模式）难以逆转，可能需要从备份恢复。";
-"This tool works via a sandbox escape (bad_query). It does not require a jailbreak, but it relies on specific iOS build vulnerabilities that may be patched in future updates." = "本工具通过沙盒逃逸（bad_query）工作。不需要越狱，但依赖特定 iOS 内部版本漏洞，未来更新可能会修补。";
+"This tool works via sandbox escapes (bad_query / worse_query). It does not require a jailbreak, but it relies on specific iOS build vulnerabilities that may be patched in future updates. On iOS 27.2+, only worse_query is active — it additionally requires the app's App Group entitlement." = "本工具通过沙盒逃逸（bad_query / worse_query）工作。不需要越狱，但依赖特定 iOS 版本漏洞，未来更新可能会修补。在 iOS 27.2 及以上，仅 worse_query 生效——它额外要求 App 声明 App Group 权限。";
 "Before You Begin" = "开始之前";
 "I understand that I should create a backup before making changes, and that automatic backups are created before each write." = "我了解在做出更改之前应创建备份，并且每次写入前会自动创建备份。";
 "I understand that applying changes will respring my device, causing all apps to close temporarily." = "我了解应用更改会使设备注销，导致所有应用暂时关闭。";
@@ -856,7 +854,7 @@
 
 /* Diagnostics — iOS 26.0.x enhancements */
 "Probe Flags (Find RW)" = "探测标志位（查找读写权限）";
-"Run All tests bad_query availability, sandbox lease, container discovery, and file read operations. Probe Flags enumerates flag combinations to find one that grants read-write access (diagnostic only, results in Console.app filter [GKTL-ObjC])." = "全部运行测试 bad_query 可用性、沙盒租约、容器发现和文件读取操作。探测标志位枚举标志组合，查找可授予读写权限的标志（仅供诊断，结果在 Console.app 筛选 [GKTL-ObjC]）。";
+"Run All tests bad_query / worse_query availability, sandbox lease, container discovery, and file read operations. Probe Flags enumerates flag combinations to find one that grants read-write access (diagnostic only, results in Console.app filter [GKTL-ObjC])." = "全部运行测试 bad_query / worse_query 可用性、沙盒租约、容器发现和文件读取操作。探测标志位枚举标志组合，查找可授予读写权限的标志（仅供诊断，结果在 Console.app 筛选 [GKTL-ObjC]）。";
 "Flag probe complete. Check Console.app (filter [GKTL-ObjC]) for results.\nLook for lines with canWrite=1 — that flag value grants read-write access." = "标志位探测完成。请在 Console.app 中查看结果（筛选 [GKTL-ObjC]）。\n查找 canWrite=1 的行——该标志值授予读写权限。";
 "Lease acquired for file:\n%@" = "已获取文件租约：\n%@";
 "Failed to acquire lease: %@" = "获取租约失败：%@";
@@ -867,3 +865,203 @@
 /* GestaltAccess — read-only mode */
 "The sandbox extension acquired by bad_query only grants READ access on this iOS build. MobileGestalt values can be viewed but cannot be modified. This is a known limitation of iOS 26.0.x where the group-sacrifice flags (0x0800000000) do not convey write permissions." = "bad_query 获取的沙盒扩展在此 iOS 版本上仅授予读取权限。可以查看 MobileGestalt 值但无法修改。这是 iOS 26.0.x 的已知限制，其组牺牲标志位（0x0800000000）不传达写入权限。";
 "bad_query acquired a sandbox extension, but the MobileGestalt plist is neither readable nor writable." = "bad_query 已获取沙盒扩展，但 MobileGestalt plist 既不可读也不可写。";
+"worse_query App Group container accessible." = "worse_query App Group 容器可访问。";
+"worse_query App Group container NOT accessible — check the com.apple.security.application-groups entitlement." = "worse_query App Group 容器不可访问——请检查 com.apple.security.application-groups 权限声明。";
+
+/* Carrier bundle (IPCC) probe */
+"Probe Carrier Bundles (IPCC)" = "探测运营商配置 (IPCC)";
+"Carrier-bundle probe complete. Read-only — nothing on the device was modified (except a deleted scratch file)." = "运营商配置探测完成。只读操作——未修改设备上的任何内容（仅临时探测文件已删除）。";
+
+"Copy Results" = "复制结果";
+
+/* Carrier probe verdict */
+"Conclusion: IPCC modification FEASIBLE" = "结论：IPCC 修改可行";
+"The carrier-bundle overlay exists and the sandbox lease grants read-write access. Version-anchored IPCC locking (e.g. writing a high version number into version.plist so OTA carrier payloads are refused) is technically possible on this device." = "运营商配置 overlay 存在，且沙盒租约授予了读写权限。版本锚定式 IPCC 锁定（向 version.plist 写入高版本号使 OTA 运营商载荷被拒收）在这台设备上技术可行。";
+"Conclusion: IPCC READ-ONLY" = "结论：IPCC 只读";
+"The carrier-bundle overlay exists and plist files are readable, but writes are denied. You can inspect carrier configuration but cannot lock/modify it on this build." = "运营商配置 overlay 存在且 plist 可读，但写入被拒绝。可以查看运营商配置，但无法在此系统版本上锁定/修改。";
+"Conclusion: overlay exists, contents inaccessible" = "结论：overlay 存在但内容不可访问";
+"The overlay directory exists but its carrier plists could not be read. Modification is not possible without read access." = "overlay 目录存在但其中的运营商 plist 无法读取。没有读取权限则无法修改。";
+"Conclusion: IPCC modification NOT possible on this iOS build" = "结论：此 iOS 版本无法修改 IPCC";
+"No carrier-bundle overlay directory exists in any writable location. On this iOS version, carrier configuration has been moved out of user-writable storage (likely onto the sealed system volume), so the sandbox escape cannot reach it. IPCC locking via worse_query is only viable on iOS versions where /var/mobile/Library/Carrier Bundles/Overlay still exists (iOS 26.x and earlier)." = "所有可写位置均不存在运营商配置 overlay 目录。此 iOS 版本已将运营商配置移出用户可写存储（很可能移至密封系统卷），沙盒逃逸无法触达。通过 worse_query 锁定 IPCC 仅在 /var/mobile/Library/Carrier Bundles/Overlay 仍存在的版本（iOS 26.x 及更早）可行。";
+"Save Report" = "保存报告";
+"Report saved: %@" = "报告已保存：%@";
+"Failed to save report: %@" = "报告保存失败：%@";
+
+/* Activation Health Check */
+"Device Activated & Healthy" = "设备已激活 · 状态健康";
+"Activated — Issues Found" = "已激活 · 发现异常";
+"Not Activated" = "设备未激活";
+"Brick State" = "砖机状态";
+"Unknown" = "无法判断";
+"Activation record complete, certificate chain valid. This device is fully usable." = "激活记录完整，证书链有效，设备可正常使用。";
+"Device is activated but some checks reported issues — review the technical details." = "设备已激活，但部分检查项异常，请查看技术详情。";
+"This device has not completed activation. Most features will be unavailable until activated." = "设备尚未完成激活，激活前多数功能无法使用。";
+"This device is marked bricked in its activation data. It cannot be used until restored." = "激活数据中存在砖机标记，需刷机恢复后才能使用。";
+"Activation state could not be determined from the activation records." = "无法从激活记录判断设备的激活状态。";
+"What this means" = "这意味着什么";
+"All features available" = "全部功能可用";
+"Calls, iMessage, App Store and iCloud work normally." = "电话、iMessage、App Store、iCloud 均可正常使用。";
+"Not a demo or locked unit" = "非演示机 / 有锁机";
+"The activation record matches this device and is fully signed." = "激活记录与本机匹配，签名完整。";
+"Safe to buy or keep using" = "可放心购买或继续使用";
+"No brick markers or expired-activation flags were found." = "未发现砖机标记或激活过期标记。";
+"Review certificate chain" = "请检查证书链";
+"One or more certificates in the activation record could not be parsed or look abnormal." = "激活记录中有一张或多张证书无法解析或显示异常。";
+"Device may still work" = "设备可能仍可使用";
+"Issues found are advisory — the device boots and reports itself as activated." = "异常项仅供参考——设备可正常开机且自报已激活。";
+"Activation required" = "需要激活";
+"Connect to Wi-Fi or iTunes to complete activation before use." = "请连接 Wi-Fi 或 iTunes 完成激活后再使用。";
+"Device is disabled" = "设备已被停用";
+"The activation data contains a brick marker. A full restore via computer is required." = "激活数据中包含砖机标记，需要连接电脑刷机恢复。";
+"Records unreadable" = "记录无法读取";
+"The activation plists could not be read on this device. Try rescanning." = "无法读取本机的激活记录文件，请尝试重新扫描。";
+"Activated" = "已激活";
+"Certificates" = "证书";
+"Not Bricked" = "非砖机";
+"Not Expired" = "未过期";
+"Technical Details" = "技术详情";
+"Raw fields read via worse_query from com.apple.mobileactivationd." = "通过 worse_query 从 com.apple.mobileactivationd 读取的原始字段。";
+"Activation Health" = "激活体检";
+"Activation Health Check" = "激活体检";
+"Activation state · brick state · certificate chain" = "激活状态 · 砖机标记 · 证书链";
+"Reading activation records…" = "正在读取激活记录…";
+"Activation State" = "激活状态";
+"Activation Expired Flag" = "激活过期标记";
+"Enforce Valid Record" = "强制校验激活记录";
+"Enforced (activation record must be valid)" = "已启用（激活记录必须有效）";
+"Not enforced" = "未启用";
+"Product Version (at activation)" = "激活时系统版本";
+"Last Activated Build" = "最近激活构建号";
+"Boot Session UUID" = "启动会话 UUID";
+"Account Token" = "账户令牌";
+"Present (%lld bytes)" = "存在（%lld 字节）";
+"Token Content" = "令牌内容";
+"FairPlay Key Data" = "FairPlay 密钥数据";
+"Present (%lld bytes, CONTAINER header)" = "存在（%lld 字节，CONTAINER 头）";
+"Unbrick Flag (record)" = "解除砖机标记（记录）";
+"Record allows unbrick" = "记录允许解除砖机";
+"Record does NOT unbrick" = "记录不允许解除砖机";
+"Activation Protocol Version" = "激活协议版本";
+"Regulatory Info" = "监管信息";
+"Not bricked" = "非砖机";
+"BRICKED (%lld)" = "已变砖（%lld）";
+"Not expired" = "未过期";
+"Marked expired" = "已标记过期";
+"Findings" = "检查结果";
+"Certificate Chain" = "证书链";
+"Certificates parsed from activation_record.plist via worse_query read." = "证书由 worse_query 读取 activation_record.plist 后解析。";
+"Not a parsable certificate" = "无法解析为证书";
+"System Containers (/var/containers/Data/System)" = "系统容器（/var/containers/Data/System）";
+"All containers readable via worse_query lease. Tap to browse files." = "全部容器均可通过 worse_query 租约读取，点击即可浏览文件。";
+"Scan System Containers" = "扫描系统容器";
+"Scanning system containers…" = "正在扫描系统容器…";
+"mobileactivationd container not found — scan System Containers first." = "未找到 mobileactivationd 容器——请先扫描系统容器。";
+"Both activation plists unreadable on this device." = "本机两个激活记录文件均无法读取。";
+"Audit" = "审计";
+"Auditing container…" = "正在审计容器…";
+"Summary" = "摘要";
+"Scanned" = "已扫描";
+"Readable" = "可读";
+"Blocked / missing" = "受阻 / 不存在";
+"Readable files" = "可读文件";
+"Blocked or missing" = "受阻或不存在";
+"Property lists found" = "发现的配置文件";
+"Loading…" = "加载中…";
+"Empty or unreadable directory." = "目录为空或不可读。";
+"Up — %@" = "上一级 — %@";
+"Unable to read file (MAC-blocked or missing)." = "无法读取文件（被 MAC 拦截或不存在）。";
+"Files" = "文件";
+"Activation Credentials" = "激活凭证";
+
+/* 凭证备份 / 仪表盘 / 钥匙串探测 */
+"Backup Activation Credentials" = "备份激活凭证";
+"Exports data_ark.plist and activation_record.plist as a JSON file. Keep it private — it contains your device's activation identity." = "将 data_ark.plist 和 activation_record.plist 导出为 JSON 文件。请妥善保管——其中包含本机的激活身份信息。";
+"Backup is stored temporarily on-device. Export it to a safe location." = "备份仅临时保存在设备上，请导出到安全位置。";
+"Share Backup File" = "分享备份文件";
+"Device Dashboard" = "设备仪表盘";
+"Identity & capability values from MobileGestalt cache" = "来自 MobileGestalt 缓存的设备身份与能力信息";
+"Device Identity (MobileGestalt)" = "设备身份（MobileGestalt）";
+"Values as currently stored in the MobileGestalt cache — after any tweaks you applied." = "当前 MobileGestalt 缓存中的实际值——已包含你应用过的所有修改。";
+"Keychain Probe" = "钥匙串探测";
+"Which keychain classes this sandbox can enumerate" = "测试当前沙盒能枚举哪些钥匙串类别";
+"Tests which keychain classes the sandbox lets this app enumerate. This is a read-only reachability probe — no credentials are displayed." = "测试沙盒允许本 app 枚举哪些钥匙串类别。只读探测——不会显示任何凭证内容。";
+"Results" = "结果";
+"A sandboxed app can normally only see its own keychain items. Any wider visibility would indicate a keychain access entitlement flaw." = "沙盒 app 通常只能看到自己的钥匙串条目。如果能看到更多，说明存在钥匙串访问权限缺陷。";
+"This app's keychain (kSecClassGenericPassword, wide)" = "本 app 的钥匙串（kSecClassGenericPassword，宽查询）";
+"All certificates (kSecClassCertificate, wide)" = "全部证书（kSecClassCertificate，宽查询）";
+"All identities (kSecClassIdentity, wide)" = "全部身份（kSecClassIdentity，宽查询）";
+"All keys (kSecClassKey, wide)" = "全部密钥（kSecClassKey，宽查询）";
+"errSecItemNotFound (no items in this access group)" = "errSecItemNotFound（此访问组内无条目）";
+"errSecMissingEntitlement (blocked — no keychain-access entitlement)" = "errSecMissingEntitlement（被拦截——缺少钥匙串访问权限）";
+"errSecDenied (blocked by sandbox)" = "errSecDenied（被沙盒拦截）";
+"errSecNotAvailable (no valid trust domain)" = "errSecNotAvailable（无有效信任域）";
+
+/* App Data Browser */
+"App Data" = "应用数据";
+"Browse every app's data container (system + third-party)" = "浏览每个应用的数据容器（系统 + 第三方）";
+"System Apps" = "系统应用";
+"Third-Party Apps" = "第三方应用";
+"Scanning app containers…" = "正在扫描应用容器…";
+"Bundle ID" = "Bundle ID";
+"SQLite database readable but no user tables found." = "SQLite 数据库可读但未找到用户表。";
+
+/* File preview */
+"SQLite database readable, but no user tables were parsed." = "SQLite 数据库可读，但未能解析出用户表。";
+"Markdown" = "Markdown";
+"CSV Data" = "CSV 数据";
+"WebP Image" = "WebP 图片";
+"TIFF Image" = "TIFF 图片";
+"BMP Image" = "BMP 图片";
+"HTML" = "HTML";
+"YAML" = "YAML";
+"CSS" = "CSS";
+"JavaScript" = "JavaScript";
+"Swift Source" = "Swift 源码";
+"Shell Script" = "Shell 脚本";
+"Strings" = "字符串";
+
+/* Preferences Summary */
+"Preferences Summary" = "偏好汇总";
+"Reading preference plists…" = "正在读取偏好 plist…";
+"No readable preference plists in this container." = "此容器没有可读的偏好 plist。";
+"%d keys from %d files" = "%d 个键，来自 %d 个文件";
+"Keys" = "键";
+"Key or value" = "键或值";
+"All preference values under this container's Preferences directory, flattened for search." = "此容器 Preferences 目录下的全部偏好值，平铺便于搜索。";
+"Protected by kernel extension policy — read is expected to fail. Listed for boundary documentation." = "受内核 extension policy 保护——读取预期失败。仅作边界记录。";
+"MAC-blocked at the kernel level (verified) — lists all apps' permission grants if a bypass emerges." = "内核级 MAC 拦截（已验证）——若未来出现绕过，可列出所有 app 的权限授予。";
+"MAC-blocked at the kernel level (verified) — Wi-Fi/VPN/proxy settings." = "内核级 MAC 拦截（已验证）——Wi-Fi/VPN/代理设置。";
+
+/* Siri AI Wizard */
+"Siri AI Setup Guide" = "Siri AI 开通向导";
+"Region Rewrite" = "地区改写";
+"Tool step — already automated. Writes region keys (LL / LL/A / regulatory model) into the MobileGestalt cache. Survives reboot." = "工具步骤——已自动化。将地区键（LL / LL/A / 认证型号）写入 MobileGestalt 缓存，重启后依然生效。";
+"Language & Siri" = "语言与 Siri";
+"Manual step. Settings → General → Language & Region → set to English (US). Then Settings → Siri → Language → English (United States)." = "手动步骤。设置 → 通用 → 语言与地区 → 改为 English (US)；再在 设置 → Siri → 语言 改为 English (United States)。";
+"The tool cannot do this for you: the Preferences directory only grants read-only sandbox extensions." = "此步无法由工具代劳：Preferences 目录只能获得只读沙盒扩展。";
+"Sign In to US Apple ID" = "登录美区 Apple ID";
+"Manual step. Settings → sign in with an Apple ID whose account region is United States. An iCloud account in a different region will keep the AI domain in a transient state." = "手动步骤。在设置中登录账户地区为美国的 Apple ID。其他地区的 iCloud 账户会使 AI 域一直处于待定状态。";
+"Apple ID sign-in involves passwords and two-factor authentication — no tool should automate this." = "Apple ID 登录涉及密码与双重认证——任何工具都不应自动化此操作。";
+"Eligibility Check" = "资格检查";
+"Refresh Eligibility Status" = "刷新资格状态";
+"FOUNDATION_MODELS / GREYMATTER answer: 4 = transient (inputs incomplete), 2 = eligible. Re-run after completing the manual steps and rebooting." = "FOUNDATION_MODELS / GREYMATTER 的 answer 值：4 = 待定（输入不全），2 = 已激活。完成手动步骤并重启后重新检查。";
+"eligibility.plist unreadable — sandbox extension not granted for this path." = "eligibility.plist 不可读——该路径未获得沙盒扩展。";
+
+/* Deep cache targets */
+"Snapshots" = "快照";
+"WebKit Data" = "WebKit 数据";
+"Snapshot Caches" = "快照缓存";
+"Logs" = "日志";
+"Safe Cleanup removes caches, tmp, app snapshots, WebKit data, and logs. Your app data, documents, and preferences are never touched." = "安全清理会删除缓存、临时文件、应用快照、WebKit 数据和日志。您的应用数据、文稿和偏好设置绝不会被改动。";
+
+/* Safe Cleanup scope */
+"What gets cleaned" = "会清理什么";
+"Never touched" = "绝不会动";
+"Caches" = "缓存";
+"Temporary Files" = "临时文件";
+"Documents, preferences, keychains, photos, and app data are never modified." = "文稿、偏好设置、钥匙串、照片和应用数据绝不会被修改。";
+"System-level caches (e.g. Safari system data) live in read-only protected containers and cannot be cleaned by any sandboxed tool." = "系统级缓存（如 Safari 系统数据）位于只读保护容器中，任何沙盒工具都无法清理。";
+"Only cache-class directories are touched. Tap rows to select apps; leave nothing selected to clean all." = "只处理缓存类目录。点按行可选中应用；不选中则清理全部。";
+
+/* Streaming scan */
+"%d apps found" = "已发现 %d 个应用";

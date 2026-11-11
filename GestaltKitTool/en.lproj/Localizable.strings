@@ -33,7 +33,7 @@
 "Full plist snapshot" = "Full plist snapshot";
 "Field-level patches" = "Field-level patches";
 "A backup is a full snapshot of this device's MobileGestalt plist, including device-identity fields. Use it to roll back before risky changes. Do not share across devices — restoring it on another device would overwrite its identity." = "A backup is a full snapshot of this device's MobileGestalt plist, including device-identity fields. Use it to roll back before risky changes. Do not share across devices — restoring it on another device would overwrite its identity.";
-"A patch is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "A patch is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — used to share tweak combinations.";
+"A patch is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "A patch is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations.";
 
 "Search key or value" = "Search key or value";
 "Add CacheExtra Field" = "Add CacheExtra Field";
@@ -97,7 +97,7 @@
 "Marks the device as supporting Stage Manager." = "Marks the device as supporting Stage Manager.";
 "Enables iPad app compatibility types on iPhone." = "Enables iPad app compatibility types on iPhone.";
 "Enable iPadOS Mode" = "Enable iPadOS Mode";
-"Changes five capabilities and CacheData; experimental and high risk." = "Changes five capabilities and CacheData; experimental and high risk.";
+"Changes five capabilities and CacheData; experimental and high risk. Mutually exclusive with \"Allow iPad Apps\" and \"Stage Manager Support\" — enabling one disables the others." = "Changes five capabilities and CacheData; experimental and high risk. Mutually exclusive with \"Allow iPad Apps\" and \"Stage Manager Support\" — enabling one disables the others.";
 "Enables internal capabilities such as Metal HUD; some services may misbehave." = "Enables internal capabilities such as Metal HUD; some services may misbehave.";
 "Shows internal files in Storage settings; high risk on some iPads." = "Shows internal files in Storage settings; high risk on some iPads.";
 "Marks the device as a Security Research Device." = "Marks the device as a Security Research Device.";
@@ -174,17 +174,17 @@
 "XML" = "XML";
 "Dynamic Library" = "Dynamic Library";
 "Framework Bundle" = "Framework Bundle";
-"A directory (folder). Tap to navigate into it and view its contents." = "A directory (folder). Tap to navigate into it and view its contents.";
-"An Apple property list file. Contains structured key-value data, typically used for application settings, preferences, and configuration. Can be in binary or XML format." = "Apple property list file. Binary or XML format. Stores settings, preferences, configuration as key-value data.";
-"A JSON (JavaScript Object Notation) data file. Contains structured data in a human-readable text format, commonly used for app data export, API responses, and configuration." = "JSON file. Plain text. Used for export, API responses, configuration.";
-"An SQLite database file. Contains structured data in tables, indexes, and schemas. May store app data, caches, or metadata. Binary format — view in hex mode for raw inspection." = "SQLite database. Tables, indexes, schemas. Binary — hex mode available for raw view.";
-"A plain text file. Contains unformatted text data, readable directly. May include logs, notes, or configuration data." = "Plain text file. Unformatted text, readable directly.";
-"A log file. Contains timestamped application or system events, useful for debugging and diagnostics. Plain text format." = "Log file. Timestamped events. Plain text.";
-"An image file. Contains raster graphics data. Can be previewed directly in the file viewer. Common formats include PNG, JPEG, and HEIC (Apple's high-efficiency format)." = "Image file. PNG / JPEG / HEIC. Preview supported.";
-"An XML (eXtensible Markup Language) file. Contains structured text data with tags, used for configuration, data interchange, and property lists in text format." = "XML file. Tagged text format. Used for configuration, interchange, text plists.";
-"A dynamic library (shared object). Contains compiled machine code loaded at runtime. Binary format — view in hex mode for raw inspection." = "Dynamic library (shared object). Compiled machine code, loaded at runtime. Binary — hex mode available.";
-"A framework bundle directory. Contains a dynamic library and associated resources (headers, plists). Tap to browse its contents." = "Framework bundle. Dynamic library + resources (headers, plists). Tap to browse.";
-"A file in the device filesystem. Tap to preview its contents. The file type is not specifically recognized — it may be shown as text or binary data." = "Unknown file type. Tap to preview — shown as text or binary.";
+"Directory. Tap to open it." = "Directory. Tap to open it.";
+"Key-value configuration file, in binary or XML format. Commonly stores app settings and preferences." = "Key-value configuration file, in binary or XML format. Commonly stores app settings and preferences.";
+"Structured text data. Commonly used for app data export, API responses, and configuration." = "Structured text data. Commonly used for app data export, API responses, and configuration.";
+"SQLite database. Tap to browse its tables; view raw bytes in hex mode." = "SQLite database. Tap to browse its tables; view raw bytes in hex mode.";
+"Plain text file — logs, notes, or configuration." = "Plain text file — logs, notes, or configuration.";
+"Plain text log with timestamped events; useful for diagnostics." = "Plain text log with timestamped events; useful for diagnostics.";
+"Image file (PNG / JPEG / HEIC). Preview directly in the viewer." = "Image file (PNG / JPEG / HEIC). Preview directly in the viewer.";
+"Tagged text format used for configuration, data interchange, and text plists." = "Tagged text format used for configuration, data interchange, and text plists.";
+"Compiled shared library loaded at runtime. View raw bytes in hex mode." = "Compiled shared library loaded at runtime. View raw bytes in hex mode.";
+"Bundle containing a dynamic library and its resources. Tap to browse." = "Bundle containing a dynamic library and its resources. Tap to browse.";
+"Tap to preview. Unrecognized types are shown as text or hex." = "Tap to preview. Unrecognized types are shown as text or hex.";
 
 /* System Inspector */
 "These files contain sensitive system data. Reading them demonstrates the full impact of bad_query sandbox escape." = "These files contain sensitive system data. Reading them demonstrates the full impact of bad_query sandbox escape.";
@@ -464,7 +464,7 @@
 /* Shared Profiles */
 "Shared Profiles" = "Shared Profiles";
 "Field-level configs" = "Field-level configs";
-"A shared profile is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "A shared profile is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — used to share tweak combinations.";
+"A shared profile is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations." = "A shared profile is a device-independent set of CacheExtra fields. It merges onto the current plist without touching device identity. Safe to share across devices — perfect for spreading tweak combinations.";
 "Import Patch" = "Import Patch";
 "Export Patch…" = "Export Patch…";
 "A patch contains only the CacheExtra fields the author chose to share. Importing applies it on top of the current plist and writes immediately. Export packages applied tweaks or hand-picked fields into a shareable .weskpatch." = "A patch contains only the CacheExtra fields the author chose to share. Importing applies it on top of the current plist and writes immediately. Export packages applied tweaks or hand-picked fields into a shareable .weskpatch.";
@@ -610,13 +610,12 @@
 /* SafeCleanup */
 "Clean" = "Clean";
 "Nothing to Clean" = "Nothing to Clean";
-"No app cache or temporary files were found. Your device is already clean." = "No app cache or temporary files found.";
+"No app cache or temporary files were found. Your device is already clean." = "No app cache or temporary files were found. Your device is already clean.";
 "Rescan" = "Rescan";
 "Total Cleanable" = "Total Cleanable";
 "apps" = "apps";
 "Apps with Cache" = "Apps with Cache";
 "Summary" = "Summary";
-"Safe Cleanup only removes Library/Caches and tmp/ directories. Your app data, documents, and preferences are never touched." = "Safe Cleanup only removes Library/Caches and tmp/ directories. Your app data, documents, and preferences are never touched.";
 "Apps" = "Apps";
 "Clear Selection" = "Clear Selection";
 "Cleanup Complete" = "Cleanup Complete";
@@ -652,7 +651,7 @@
 "Cancelled" = "Cancelled";
 
 /* OS support message */
-"GestaltKitTool currently supports iOS 26.0–26.6.1 and iOS 27 beta 1–4." = "GestaltKitTool currently supports iOS 26.0–26.6.1 and iOS 27 beta 1–4.";
+"GestaltKitTool currently supports iOS 26.0–26.7.2 and iOS 27 beta 1–4 / 27.2 / 27.3 beta." = "GestaltKitTool currently supports iOS 26.0–26.7.2 and iOS 27 beta 1–4 / 27.2 / 27.3 beta.";
 
 /* The applied-tweaks preset description */
 "The applied-tweaks preset selects every CacheExtra key referenced by a tweak toggle that is currently ON. You can also manually browse and pick arbitrary keys below." = "The applied-tweaks preset selects every CacheExtra key referenced by a tweak toggle that is currently ON. You can also manually browse and pick arbitrary keys below.";
@@ -763,7 +762,7 @@
 "A backup is created automatically before each write. You can also create manual backups from the Backups screen." = "A backup is created automatically before each write. You can also create manual backups from the Backups screen.";
 "Changes are applied immediately. After writing, the device will respring (restart SpringBoard) for changes to take effect." = "Changes are applied immediately. After writing, the device will respring (restart SpringBoard) for changes to take effect.";
 "Some changes (e.g. enabling iPadOS mode) are difficult to reverse and may require restoring from a backup." = "Some changes (e.g. enabling iPadOS mode) are difficult to reverse and may require restoring from a backup.";
-"This tool works via a sandbox escape (bad_query). It does not require a jailbreak, but it relies on specific iOS build vulnerabilities that may be patched in future updates." = "This tool works via a sandbox escape (bad_query). It does not require a jailbreak, but it relies on specific iOS build vulnerabilities that may be patched in future updates.";
+"This tool works via sandbox escapes (bad_query / worse_query). It does not require a jailbreak, but it relies on specific iOS build vulnerabilities that may be patched in future updates. On iOS 27.2+, only worse_query is active — it additionally requires the app's App Group entitlement." = "This tool works via sandbox escapes (bad_query / worse_query). It does not require a jailbreak, but it relies on specific iOS build vulnerabilities that may be patched in future updates. On iOS 27.2+, only worse_query is active — it additionally requires the app's App Group entitlement.";
 "Before You Begin" = "Before You Begin";
 "I understand that I should create a backup before making changes, and that automatic backups are created before each write." = "I understand that I should create a backup before making changes, and that automatic backups are created before each write.";
 "I understand that applying changes will respring my device, causing all apps to close temporarily." = "I understand that applying changes will respring my device, causing all apps to close temporarily.";
@@ -854,7 +853,7 @@
 
 /* Diagnostics — iOS 26.0.x enhancements */
 "Probe Flags (Find RW)" = "Probe Flags (Find RW)";
-"Run All tests bad_query availability, sandbox lease, container discovery, and file read operations. Probe Flags enumerates flag combinations to find one that grants read-write access (diagnostic only, results in Console.app filter [GKTL-ObjC])." = "Run All tests bad_query availability, sandbox lease, container discovery, and file read operations. Probe Flags enumerates flag combinations to find one that grants read-write access (diagnostic only, results in Console.app filter [GKTL-ObjC]).";
+"Run All tests bad_query / worse_query availability, sandbox lease, container discovery, and file read operations. Probe Flags enumerates flag combinations to find one that grants read-write access (diagnostic only, results in Console.app filter [GKTL-ObjC])." = "Run All tests bad_query / worse_query availability, sandbox lease, container discovery, and file read operations. Probe Flags enumerates flag combinations to find one that grants read-write access (diagnostic only, results in Console.app filter [GKTL-ObjC]).";
 "Flag probe complete. Check Console.app (filter [GKTL-ObjC]) for results.\nLook for lines with canWrite=1 — that flag value grants read-write access." = "Flag probe complete. Check Console.app (filter [GKTL-ObjC]) for results.\nLook for lines with canWrite=1 — that flag value grants read-write access.";
 "Lease acquired for file:\n%@" = "Lease acquired for file:\n%@";
 "Failed to acquire lease: %@" = "Failed to acquire lease: %@";
@@ -865,3 +864,203 @@
 /* GestaltAccess — read-only mode */
 "The sandbox extension acquired by bad_query only grants READ access on this iOS build. MobileGestalt values can be viewed but cannot be modified. This is a known limitation of iOS 26.0.x where the group-sacrifice flags (0x0800000000) do not convey write permissions." = "The sandbox extension acquired by bad_query only grants READ access on this iOS build. MobileGestalt values can be viewed but cannot be modified. This is a known limitation of iOS 26.0.x where the group-sacrifice flags (0x0800000000) do not convey write permissions.";
 "bad_query acquired a sandbox extension, but the MobileGestalt plist is neither readable nor writable." = "bad_query acquired a sandbox extension, but the MobileGestalt plist is neither readable nor writable.";
+"worse_query App Group container accessible." = "worse_query App Group container accessible.";
+"worse_query App Group container NOT accessible — check the com.apple.security.application-groups entitlement." = "worse_query App Group container NOT accessible — check the com.apple.security.application-groups entitlement.";
+
+/* Carrier bundle (IPCC) probe */
+"Probe Carrier Bundles (IPCC)" = "Probe Carrier Bundles (IPCC)";
+"Carrier-bundle probe complete. Read-only — nothing on the device was modified (except a deleted scratch file)." = "Carrier-bundle probe complete. Read-only — nothing on the device was modified (except a deleted scratch file).";
+
+"Copy Results" = "Copy Results";
+
+/* Carrier probe verdict */
+"Conclusion: IPCC modification FEASIBLE" = "Conclusion: IPCC modification FEASIBLE";
+"The carrier-bundle overlay exists and the sandbox lease grants read-write access. Version-anchored IPCC locking (e.g. writing a high version number into version.plist so OTA carrier payloads are refused) is technically possible on this device." = "The carrier-bundle overlay exists and the sandbox lease grants read-write access. Version-anchored IPCC locking (e.g. writing a high version number into version.plist so OTA carrier payloads are refused) is technically possible on this device.";
+"Conclusion: IPCC READ-ONLY" = "Conclusion: IPCC READ-ONLY";
+"The carrier-bundle overlay exists and plist files are readable, but writes are denied. You can inspect carrier configuration but cannot lock/modify it on this build." = "The carrier-bundle overlay exists and plist files are readable, but writes are denied. You can inspect carrier configuration but cannot lock/modify it on this build.";
+"Conclusion: overlay exists, contents inaccessible" = "Conclusion: overlay exists, contents inaccessible";
+"The overlay directory exists but its carrier plists could not be read. Modification is not possible without read access." = "The overlay directory exists but its carrier plists could not be read. Modification is not possible without read access.";
+"Conclusion: IPCC modification NOT possible on this iOS build" = "Conclusion: IPCC modification NOT possible on this iOS build";
+"No carrier-bundle overlay directory exists in any writable location. On this iOS version, carrier configuration has been moved out of user-writable storage (likely onto the sealed system volume), so the sandbox escape cannot reach it. IPCC locking via worse_query is only viable on iOS versions where /var/mobile/Library/Carrier Bundles/Overlay still exists (iOS 26.x and earlier)." = "No carrier-bundle overlay directory exists in any writable location. On this iOS version, carrier configuration has been moved out of user-writable storage (likely onto the sealed system volume), so the sandbox escape cannot reach it. IPCC locking via worse_query is only viable on iOS versions where /var/mobile/Library/Carrier Bundles/Overlay still exists (iOS 26.x and earlier).";
+"Save Report" = "Save Report";
+"Report saved: %@" = "Report saved: %@";
+"Failed to save report: %@" = "Failed to save report: %@";
+
+/* Activation Health Check */
+"Device Activated & Healthy" = "Device Activated & Healthy";
+"Activated — Issues Found" = "Activated — Issues Found";
+"Not Activated" = "Not Activated";
+"Brick State" = "Brick State";
+"Unknown" = "Unknown";
+"Activation record complete, certificate chain valid. This device is fully usable." = "Activation record complete, certificate chain valid. This device is fully usable.";
+"Device is activated but some checks reported issues — review the technical details." = "Device is activated but some checks reported issues — review the technical details.";
+"This device has not completed activation. Most features will be unavailable until activated." = "This device has not completed activation. Most features will be unavailable until activated.";
+"This device is marked bricked in its activation data. It cannot be used until restored." = "This device is marked bricked in its activation data. It cannot be used until restored.";
+"Activation state could not be determined from the activation records." = "Activation state could not be determined from the activation records.";
+"What this means" = "What this means";
+"All features available" = "All features available";
+"Calls, iMessage, App Store and iCloud work normally." = "Calls, iMessage, App Store and iCloud work normally.";
+"Not a demo or locked unit" = "Not a demo or locked unit";
+"The activation record matches this device and is fully signed." = "The activation record matches this device and is fully signed.";
+"Safe to buy or keep using" = "Safe to buy or keep using";
+"No brick markers or expired-activation flags were found." = "No brick markers or expired-activation flags were found.";
+"Review certificate chain" = "Review certificate chain";
+"One or more certificates in the activation record could not be parsed or look abnormal." = "One or more certificates in the activation record could not be parsed or look abnormal.";
+"Device may still work" = "Device may still work";
+"Issues found are advisory — the device boots and reports itself as activated." = "Issues found are advisory — the device boots and reports itself as activated.";
+"Activation required" = "Activation required";
+"Connect to Wi-Fi or iTunes to complete activation before use." = "Connect to Wi-Fi or iTunes to complete activation before use.";
+"Device is disabled" = "Device is disabled";
+"The activation data contains a brick marker. A full restore via computer is required." = "The activation data contains a brick marker. A full restore via computer is required.";
+"Records unreadable" = "Records unreadable";
+"The activation plists could not be read on this device. Try rescanning." = "The activation plists could not be read on this device. Try rescanning.";
+"Activated" = "Activated";
+"Certificates" = "Certificates";
+"Not Bricked" = "Not Bricked";
+"Not Expired" = "Not Expired";
+"Technical Details" = "Technical Details";
+"Raw fields read via worse_query from com.apple.mobileactivationd." = "Raw fields read via worse_query from com.apple.mobileactivationd.";
+"Activation Health" = "Activation Health";
+"Activation Health Check" = "Activation Health Check";
+"Activation state · brick state · certificate chain" = "Activation state · brick state · certificate chain";
+"Reading activation records…" = "Reading activation records…";
+"Activation State" = "Activation State";
+"Activation Expired Flag" = "Activation Expired Flag";
+"Enforce Valid Record" = "Enforce Valid Record";
+"Enforced (activation record must be valid)" = "Enforced (activation record must be valid)";
+"Not enforced" = "Not enforced";
+"Product Version (at activation)" = "Product Version (at activation)";
+"Last Activated Build" = "Last Activated Build";
+"Boot Session UUID" = "Boot Session UUID";
+"Account Token" = "Account Token";
+"Present (%lld bytes)" = "Present (%lld bytes)";
+"Token Content" = "Token Content";
+"FairPlay Key Data" = "FairPlay Key Data";
+"Present (%lld bytes, CONTAINER header)" = "Present (%lld bytes, CONTAINER header)";
+"Unbrick Flag (record)" = "Unbrick Flag (record)";
+"Record allows unbrick" = "Record allows unbrick";
+"Record does NOT unbrick" = "Record does NOT unbrick";
+"Activation Protocol Version" = "Activation Protocol Version";
+"Regulatory Info" = "Regulatory Info";
+"Not bricked" = "Not bricked";
+"BRICKED (%lld)" = "BRICKED (%lld)";
+"Not expired" = "Not expired";
+"Marked expired" = "Marked expired";
+"Findings" = "Findings";
+"Certificate Chain" = "Certificate Chain";
+"Certificates parsed from activation_record.plist via worse_query read." = "Certificates parsed from activation_record.plist via worse_query read.";
+"Not a parsable certificate" = "Not a parsable certificate";
+"System Containers (/var/containers/Data/System)" = "System Containers (/var/containers/Data/System)";
+"All containers readable via worse_query lease. Tap to browse files." = "All containers readable via worse_query lease. Tap to browse files.";
+"Scan System Containers" = "Scan System Containers";
+"Scanning system containers…" = "Scanning system containers…";
+"mobileactivationd container not found — scan System Containers first." = "mobileactivationd container not found — scan System Containers first.";
+"Both activation plists unreadable on this device." = "Both activation plists unreadable on this device.";
+"Audit" = "Audit";
+"Auditing container…" = "Auditing container…";
+"Summary" = "Summary";
+"Scanned" = "Scanned";
+"Readable" = "Readable";
+"Blocked / missing" = "Blocked / missing";
+"Readable files" = "Readable files";
+"Blocked or missing" = "Blocked or missing";
+"Property lists found" = "Property lists found";
+"Loading…" = "Loading…";
+"Empty or unreadable directory." = "Empty or unreadable directory.";
+"Up — %@" = "Up — %@";
+"Unable to read file (MAC-blocked or missing)." = "Unable to read file (MAC-blocked or missing).";
+"Files" = "Files";
+"Activation Credentials" = "Activation Credentials";
+
+/* Credential backup / dashboard / keychain */
+"Backup Activation Credentials" = "Backup Activation Credentials";
+"Exports data_ark.plist and activation_record.plist as a JSON file. Keep it private — it contains your device's activation identity." = "Exports data_ark.plist and activation_record.plist as a JSON file. Keep it private — it contains your device's activation identity.";
+"Backup is stored temporarily on-device. Export it to a safe location." = "Backup is stored temporarily on-device. Export it to a safe location.";
+"Share Backup File" = "Share Backup File";
+"Device Dashboard" = "Device Dashboard";
+"Identity & capability values from MobileGestalt cache" = "Identity & capability values from MobileGestalt cache";
+"Device Identity (MobileGestalt)" = "Device Identity (MobileGestalt)";
+"Values as currently stored in the MobileGestalt cache — after any tweaks you applied." = "Values as currently stored in the MobileGestalt cache — after any tweaks you applied.";
+"Keychain Probe" = "Keychain Probe";
+"Which keychain classes this sandbox can enumerate" = "Which keychain classes this sandbox can enumerate";
+"Tests which keychain classes the sandbox lets this app enumerate. This is a read-only reachability probe — no credentials are displayed." = "Tests which keychain classes the sandbox lets this app enumerate. This is a read-only reachability probe — no credentials are displayed.";
+"Results" = "Results";
+"A sandboxed app can normally only see its own keychain items. Any wider visibility would indicate a keychain access entitlement flaw." = "A sandboxed app can normally only see its own keychain items. Any wider visibility would indicate a keychain access entitlement flaw.";
+"This app's keychain (kSecClassGenericPassword, wide)" = "This app's keychain (kSecClassGenericPassword, wide)";
+"All certificates (kSecClassCertificate, wide)" = "All certificates (kSecClassCertificate, wide)";
+"All identities (kSecClassIdentity, wide)" = "All identities (kSecClassIdentity, wide)";
+"All keys (kSecClassKey, wide)" = "All keys (kSecClassKey, wide)";
+"errSecItemNotFound (no items in this access group)" = "errSecItemNotFound (no items in this access group)";
+"errSecMissingEntitlement (blocked — no keychain-access entitlement)" = "errSecMissingEntitlement (blocked — no keychain-access entitlement)";
+"errSecDenied (blocked by sandbox)" = "errSecDenied (blocked by sandbox)";
+"errSecNotAvailable (no valid trust domain)" = "errSecNotAvailable (no valid trust domain)";
+
+/* App Data Browser */
+"App Data" = "App Data";
+"Browse every app's data container (system + third-party)" = "Browse every app's data container (system + third-party)";
+"System Apps" = "System Apps";
+"Third-Party Apps" = "Third-Party Apps";
+"Scanning app containers…" = "Scanning app containers…";
+"Bundle ID" = "Bundle ID";
+"SQLite database readable but no user tables found." = "SQLite database readable but no user tables found.";
+
+/* File preview */
+"SQLite database readable, but no user tables were parsed." = "SQLite database readable, but no user tables were parsed.";
+"Markdown" = "Markdown";
+"CSV Data" = "CSV Data";
+"WebP Image" = "WebP Image";
+"TIFF Image" = "TIFF Image";
+"BMP Image" = "BMP Image";
+"HTML" = "HTML";
+"YAML" = "YAML";
+"CSS" = "CSS";
+"JavaScript" = "JavaScript";
+"Swift Source" = "Swift Source";
+"Shell Script" = "Shell Script";
+"Strings" = "Strings";
+
+/* Preferences Summary */
+"Preferences Summary" = "Preferences Summary";
+"Reading preference plists…" = "Reading preference plists…";
+"No readable preference plists in this container." = "No readable preference plists in this container.";
+"%d keys from %d files" = "%d keys from %d files";
+"Keys" = "Keys";
+"Key or value" = "Key or value";
+"All preference values under this container's Preferences directory, flattened for search." = "All preference values under this container's Preferences directory, flattened for search.";
+"Protected by kernel extension policy — read is expected to fail. Listed for boundary documentation." = "Protected by kernel extension policy — read is expected to fail. Listed for boundary documentation.";
+"MAC-blocked at the kernel level (verified) — lists all apps' permission grants if a bypass emerges." = "MAC-blocked at the kernel level (verified) — lists all apps' permission grants if a bypass emerges.";
+"MAC-blocked at the kernel level (verified) — Wi-Fi/VPN/proxy settings." = "MAC-blocked at the kernel level (verified) — Wi-Fi/VPN/proxy settings.";
+
+/* Siri AI Wizard */
+"Siri AI Setup Guide" = "Siri AI Setup Guide";
+"Region Rewrite" = "Region Rewrite";
+"Tool step — already automated. Writes region keys (LL / LL/A / regulatory model) into the MobileGestalt cache. Survives reboot." = "Tool step — already automated. Writes region keys (LL / LL/A / regulatory model) into the MobileGestalt cache. Survives reboot.";
+"Language & Siri" = "Language & Siri";
+"Manual step. Settings → General → Language & Region → set to English (US). Then Settings → Siri → Language → English (United States)." = "Manual step. Settings → General → Language & Region → set to English (US). Then Settings → Siri → Language → English (United States).";
+"The tool cannot do this for you: the Preferences directory only grants read-only sandbox extensions." = "The tool cannot do this for you: the Preferences directory only grants read-only sandbox extensions.";
+"Sign In to US Apple ID" = "Sign In to US Apple ID";
+"Manual step. Settings → sign in with an Apple ID whose account region is United States. An iCloud account in a different region will keep the AI domain in a transient state." = "Manual step. Settings → sign in with an Apple ID whose account region is United States. An iCloud account in a different region will keep the AI domain in a transient state.";
+"Apple ID sign-in involves passwords and two-factor authentication — no tool should automate this." = "Apple ID sign-in involves passwords and two-factor authentication — no tool should automate this.";
+"Eligibility Check" = "Eligibility Check";
+"Refresh Eligibility Status" = "Refresh Eligibility Status";
+"FOUNDATION_MODELS / GREYMATTER answer: 4 = transient (inputs incomplete), 2 = eligible. Re-run after completing the manual steps and rebooting." = "FOUNDATION_MODELS / GREYMATTER answer: 4 = transient (inputs incomplete), 2 = eligible. Re-run after completing the manual steps and rebooting.";
+"eligibility.plist unreadable — sandbox extension not granted for this path." = "eligibility.plist unreadable — sandbox extension not granted for this path.";
+
+/* Deep cache targets */
+"Snapshots" = "Snapshots";
+"WebKit Data" = "WebKit Data";
+"Snapshot Caches" = "Snapshot Caches";
+"Logs" = "Logs";
+"Safe Cleanup removes caches, tmp, app snapshots, WebKit data, and logs. Your app data, documents, and preferences are never touched." = "Safe Cleanup removes caches, tmp, app snapshots, WebKit data, and logs. Your app data, documents, and preferences are never touched.";
+
+/* Safe Cleanup scope */
+"What gets cleaned" = "What gets cleaned";
+"Never touched" = "Never touched";
+"Caches" = "Caches";
+"Temporary Files" = "Temporary Files";
+"Documents, preferences, keychains, photos, and app data are never modified." = "Documents, preferences, keychains, photos, and app data are never modified.";
+"System-level caches (e.g. Safari system data) live in read-only protected containers and cannot be cleaned by any sandboxed tool." = "System-level caches (e.g. Safari system data) live in read-only protected containers and cannot be cleaned by any sandboxed tool.";
+"Only cache-class directories are touched. Tap rows to select apps; leave nothing selected to clean all." = "Only cache-class directories are touched. Tap rows to select apps; leave nothing selected to clean all.";
+
+/* Streaming scan */
+"%d apps found" = "%d apps found";

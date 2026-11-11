@@ -2118,7 +2118,9 @@ final class FileExplorerModel: ObservableObject {
         guard !isCancelled(), depth <= maxDepth, results.count < maxResults else { return }
 
         var listError: NSError?
-        let entries = fileAccess.listDirectory(atPath: path, error: &listError)
+        // No-fallback: recursive search walks every container subtree;
+        // a denied lease must mean "skip", never a 350K-inode scan.
+        let entries = fileAccess.listDirectoryNoFallback(atPath: path, error: &listError)
         if entries.isEmpty { return }
 
         // If caller gave us a prebuilt ASCII needle, we use the
@@ -2242,18 +2244,7 @@ final class FileExplorerModel: ObservableObject {
     /// (note "container_manager" not "container").
     /// Uses a single sandbox lease — fails fast if the file is inaccessible.
     private nonisolated static func extractBundleId(fileAccess: BadQueryFileAccess, containerPath: String) -> String? {
-        let metadataPath = containerPath + "/.com.apple.mobile_container_manager.metadata.plist"
-        guard let data = try? fileAccess.readFile(atPath: metadataPath) else { return nil }
-        return extractBundleIdFromMetadata(data)
-    }
-
-    /// Extracts MCMMetadataIdentifier from metadata plist data.
-    private nonisolated static func extractBundleIdFromMetadata(_ data: Data) -> String? {
-        var format = PropertyListSerialization.PropertyListFormat.binary
-        guard let plist = try? PropertyListSerialization.propertyList(
-            from: data, options: [], format: &format
-        ) as? [String: Any] else { return nil }
-        return plist["MCMMetadataIdentifier"] as? String
+        ContainerMetadata.bundleId(fileAccess: fileAccess, containerPath: containerPath)
     }
 
     /// Best-effort display name: uses bundle ID last component as the name.
@@ -2283,9 +2274,41 @@ struct FilePreview: Identifiable, Equatable {
         lhs.id == rhs.id
     }
 
-    /// Attempts to decode the data as a UTF-8 string.
+    /// Attempts to decode the data as UTF-8, then UTF-16 (with BOM
+    /// detection and a printable-ratio heuristic to reject the wrong
+    /// endianness, which silently decodes into CJK garbage).
+    /// UTF-8 is only accepted when the result contains no NUL — a
+    /// NUL-bearing payload is actually UTF-16/32, not UTF-8 text.
     var textPreview: String? {
-        String(data: data, encoding: .utf8)
+        if let s = String(data: data, encoding: .utf8), !s.contains("\0") {
+            return s
+        }
+        // BOM checks first.
+        if data.count >= 2 {
+            let b0 = data[data.startIndex], b1 = data[data.index(after: data.startIndex)]
+            if b0 == 0xFE && b1 == 0xFF {
+                return String(data: data, encoding: .utf16BigEndian)
+            }
+            if b0 == 0xFF && b1 == 0xFE {
+                return String(data: data, encoding: .utf16LittleEndian)
+            }
+        }
+        // No BOM: try both endiannesses and keep the one that decodes
+        // to mostly-printable ASCII/Latin text.
+        func printableScore(_ s: String) -> Int {
+            var n = 0
+            for ch in s {
+                if ch.isASCII && (ch.isLetter || ch.isNumber || ch.isPunctuation || ch == " " || ch.isNewline) { n += 1 }
+                else if ch.unicodeScalars.count > 1 || !ch.isASCII { n -= 2 }
+            }
+            return n
+        }
+        let be = String(data: data, encoding: .utf16BigEndian)
+        let le = String(data: data, encoding: .utf16LittleEndian)
+        if let be, let le {
+            return printableScore(be) >= printableScore(le) ? be : le
+        }
+        return be ?? le
     }
 
     /// Returns a hex dump of the first 4KB with offset + ASCII sidebar.
@@ -2316,6 +2339,22 @@ struct FilePreview: Identifiable, Equatable {
             offset += 16
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// Parsed SQLite tables if the data is a valid SQLite database.
+    /// Keys are table names, values are row dictionaries. Empty
+    /// tables are omitted.
+    var sqliteTables: [String: [[String: String]]]? {
+        guard detectedType == .database else { return nil }
+        let parser = SQLiteParser(data: data)
+        var result: [String: [[String: String]]] = [:]
+        for table in parser.parseTables() {
+            if table.hasPrefix("sqlite_") { continue }
+            let (_, rows) = parser.parseTable(table)
+            guard !rows.isEmpty else { continue }
+            result[table] = rows
+        }
+        return result.isEmpty ? nil : result
     }
 
     /// Parsed plist dictionary if the data is a valid property list.

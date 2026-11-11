@@ -160,7 +160,9 @@ final class AppBackupManager: ObservableObject {
         Task.detached(priority: .userInitiated) { [weak self] in
             // Phase 1: Enumerate all files
             var listError: NSError?
-            let entries = fileAccess.recursiveList(atPath: sourcePath, maxDepth: 10, error: &listError)
+            // No-fallback: a denied lease on a subtree must skip it,
+            // not trigger a 350K-inode fsgetpath scan per subtree.
+            let entries = fileAccess.recursiveListNoFallback(atPath: sourcePath, maxDepth: 10, error: &listError)
 
             if let listError {
                 Task { @MainActor [weak self] in

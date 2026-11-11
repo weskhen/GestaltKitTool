@@ -12,6 +12,12 @@ import SwiftUI
 import UIKit
 
 struct FileExplorerView: View {
+    /// Optional initial directory to open instead of the root page.
+    /// Used by Tools → System Inspector → "App Data" so it can hand off
+    /// to the full-featured Explorer instead of the removed
+    /// AppDataBrowserView.
+    var initialPath: String? = nil
+
     @StateObject private var model = FileExplorerModel()
     @State private var searchText = ""
     @State private var searchDebounceTask: Task<Void, Never>?
@@ -215,6 +221,11 @@ struct FileExplorerView: View {
         .task {
             if model.containers.isEmpty {
                 model.discoverContainers()
+            }
+            // Hand-off from Tools: open straight into a container root
+            // (e.g. App Data) instead of the Explorer landing page.
+            if let initialPath {
+                model.enterQuickPath(initialPath)
             }
         }
         // Single sheet manager — only one sheet can be presented at a time.
@@ -1816,7 +1827,9 @@ private struct FileEntryRow: View {
 
 // MARK: - File Preview Sheet
 
-private struct FilePreviewSheet: View {
+/// Generic file preview sheet (auto/text/hex) — also reused by the
+/// container browser for non-plist files.
+struct FilePreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
     let preview: FilePreview
     @State private var displayMode: DisplayMode = .auto
@@ -1946,16 +1959,20 @@ private struct FilePreviewSheet: View {
         case .image:
             imageDisplay
         case .database:
-            VStack(spacing: 8) {
-                Image(systemName: "cylinder.split.1x2.fill")
-                    .font(.largeTitle)
-                    .foregroundStyle(.brown)
-                Text(String(localized: "SQLite database — binary content shown in hex mode."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if let tables = preview.sqliteTables {
+                SQLiteDisplayView(tables: tables)
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "cylinder.split.1x2.fill")
+                        .font(.largeTitle)
+                        .foregroundStyle(.brown)
+                    Text(String(localized: "SQLite database readable, but no user tables were parsed."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 20)
         case .binary:
             hexDisplay
         }
@@ -1984,6 +2001,13 @@ private struct FilePreviewSheet: View {
             }
         case .image:
             imageDisplay
+        case .database:
+            if let tables = preview.sqliteTables {
+                SQLiteDisplayView(tables: tables)
+            } else {
+                Text(String(localized: "Unable to parse as SQLite database."))
+                    .foregroundStyle(.secondary)
+            }
         default:
             Text(String(localized: "No structured view available for this file type."))
                 .foregroundStyle(.secondary)
@@ -2142,31 +2166,31 @@ private struct FileDetailSheet: View {
 
     private var fileDescription: String {
         if entry.isDirectory {
-            return String(localized: "A directory (folder). Tap to navigate into it and view its contents.")
+            return String(localized: "Directory. Tap to open it.")
         }
 
         let ext = (entry.name as NSString).pathExtension.lowercased()
         switch ext {
         case "plist":
-            return String(localized: "An Apple property list file. Contains structured key-value data, typically used for application settings, preferences, and configuration. Can be in binary or XML format.")
+            return String(localized: "Key-value configuration file, in binary or XML format. Commonly stores app settings and preferences.")
         case "json":
-            return String(localized: "A JSON (JavaScript Object Notation) data file. Contains structured data in a human-readable text format, commonly used for app data export, API responses, and configuration.")
+            return String(localized: "Structured text data. Commonly used for app data export, API responses, and configuration.")
         case "sqlite", "db":
-            return String(localized: "An SQLite database file. Contains structured data in tables, indexes, and schemas. May store app data, caches, or metadata. Binary format — view in hex mode for raw inspection.")
+            return String(localized: "SQLite database. Tap to browse its tables; view raw bytes in hex mode.")
         case "txt":
-            return String(localized: "A plain text file. Contains unformatted text data, readable directly. May include logs, notes, or configuration data.")
+            return String(localized: "Plain text file — logs, notes, or configuration.")
         case "log":
-            return String(localized: "A log file. Contains timestamped application or system events, useful for debugging and diagnostics. Plain text format.")
+            return String(localized: "Plain text log with timestamped events; useful for diagnostics.")
         case "png", "jpg", "jpeg", "heic":
-            return String(localized: "An image file. Contains raster graphics data. Can be previewed directly in the file viewer. Common formats include PNG, JPEG, and HEIC (Apple's high-efficiency format).")
+            return String(localized: "Image file (PNG / JPEG / HEIC). Preview directly in the viewer.")
         case "xml":
-            return String(localized: "An XML (eXtensible Markup Language) file. Contains structured text data with tags, used for configuration, data interchange, and property lists in text format.")
+            return String(localized: "Tagged text format used for configuration, data interchange, and text plists.")
         case "dylib":
-            return String(localized: "A dynamic library (shared object). Contains compiled machine code loaded at runtime. Binary format — view in hex mode for raw inspection.")
+            return String(localized: "Compiled shared library loaded at runtime. View raw bytes in hex mode.")
         case "framework":
-            return String(localized: "A framework bundle directory. Contains a dynamic library and associated resources (headers, plists). Tap to browse its contents.")
+            return String(localized: "Bundle containing a dynamic library and its resources. Tap to browse.")
         default:
-            return String(localized: "A file in the device filesystem. Tap to preview its contents. The file type is not specifically recognized — it may be shown as text or binary data.")
+            return String(localized: "Tap to preview. Unrecognized types are shown as text or hex.")
         }
     }
 

@@ -12,6 +12,7 @@ import SwiftUI
 
 struct SystemInspectorView: View {
     @StateObject private var model = SystemInspectorModel()
+    @StateObject private var containerScanner = SystemContainerScanner()
 
     var body: some View {
         List {
@@ -24,6 +25,133 @@ struct SystemInspectorView: View {
                 } icon: {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
+                }
+            }
+
+            // System containers discovered via the escape (dynamic scan)
+            Section {
+                if containerScanner.isScanning {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text(String(localized: "Scanning system containers…"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if containerScanner.containers.isEmpty {
+                    Button {
+                        containerScanner.scan()
+                    } label: {
+                        Label(
+                            String(localized: "Scan System Containers"),
+                            systemImage: "arrow.clockwise.circle"
+                        )
+                    }
+                } else {
+                    // Activation health check (data_ark + record analysis)
+                    NavigationLink {
+                        ActivationReportView(container: containerScanner.activationContainer)
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(String(localized: "Activation Health Check"))
+                                    .font(.body.weight(.medium))
+                                Text(String(localized: "Activation state · brick state · certificate chain"))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "heart.text.clipboard")
+                                .foregroundStyle(.red)
+                        }
+                    }
+                    // Device identity dashboard (MobileGestalt cache)
+                    NavigationLink {
+                        DeviceDashboardView()
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(String(localized: "Device Dashboard"))
+                                    .font(.body.weight(.medium))
+                                Text(String(localized: "Identity & capability values from MobileGestalt cache"))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "iphone.gen3")
+                                .foregroundStyle(.blue)
+                        }
+                    }
+                    // Keychain reachability probe (exploratory)
+                    NavigationLink {
+                        KeychainProbeView()
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(String(localized: "Keychain Probe"))
+                                    .font(.body.weight(.medium))
+                                Text(String(localized: "Which keychain classes this sandbox can enumerate"))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "key.viewfinder")
+                                .foregroundStyle(.purple)
+                        }
+                    }
+                    // App data browser → hands off to the full Explorer
+                    // with the app-data container root pre-opened.
+                    NavigationLink {
+                        FileExplorerView(
+                            initialPath: "/var/mobile/Containers/Data/Application"
+                        )
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(String(localized: "App Data"))
+                                    .font(.body.weight(.medium))
+                                Text(String(localized: "Browse every app's data container (system + third-party)"))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "square.grid.2x2")
+                                .foregroundStyle(.green)
+                        }
+                    }
+                    // Activation credentials shortcut (mobileactivationd)
+                    if let act = containerScanner.activationContainer {
+                        NavigationLink {
+                            ActivationCredentialView(container: act)
+                        } label: {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(String(localized: "Activation Credentials"))
+                                        .font(.body.weight(.medium))
+                                    Text("data_ark.plist · activation_record.plist")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: "key.horizontal")
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                    }
+                    ForEach(
+                        containerScanner.groupedByOwner,
+                        id: \.owner
+                    ) { group in
+                        SystemContainerDisclosureGroup(group: group)
+                    }
+                }
+            } header: {
+                Label(
+                    String(localized: "System Containers (/var/containers/Data/System)"),
+                    systemImage: "shippingbox"
+                )
+            } footer: {
+                if !containerScanner.containers.isEmpty {
+                    Text(String(localized: "All containers readable via worse_query lease. Tap to browse files."))
                 }
             }
 
@@ -63,6 +191,18 @@ struct SystemInspectorView: View {
         }
         .navigationTitle("System Inspector")
         .navigationBarTitleDisplayMode(.large)
+        .task {
+            // Auto-scan once when the inspector opens.
+            if !containerScanner.hasScanned {
+                containerScanner.scan()
+            }
+            // Auto-probe the system keychain database once, so results
+            // land in syslog for automated verification.
+            if model.results.isEmpty,
+               let kcTarget = SystemInspectorModel.targets.first(where: { $0.id == "keychain_db" }) {
+                model.readTarget(kcTarget)
+            }
+        }
         .alert(String(localized: "Error"), isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
@@ -70,6 +210,58 @@ struct SystemInspectorView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(model.errorMessage ?? "")
+        }
+    }
+}
+
+// MARK: - System Container Group (expandable)
+
+/// DisclosureGroup with a real @State binding so tapping the row
+/// actually toggles expansion (the old .constant() binding made
+/// "unknown" groups appear unresponsive).
+private struct SystemContainerDisclosureGroup: View {
+    let group: (owner: String, containers: [SystemContainer])
+    @State private var isExpanded: Bool
+
+    init(group: (owner: String, containers: [SystemContainer])) {
+        self.group = group
+        // mobileactivationd starts expanded; everything else collapsed.
+        _isExpanded = State(initialValue: group.owner == "com.apple.mobileactivationd")
+    }
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            ForEach(group.containers) { container in
+                NavigationLink {
+                    SystemContainerBrowserView(container: container)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "externaldrive")
+                            .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(container.uuid)
+                                .font(.system(.caption, design: .monospaced))
+                            Text(container.ownerBundleID)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack {
+                Text(group.owner)
+                    .font(.callout.weight(.medium))
+                if group.owner.lowercased().contains("unknown") {
+                    Image(systemName: "questionmark.circle")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text("\(group.containers.count)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }
@@ -342,6 +534,8 @@ private struct SystemFileResultSheet: View {
             }
         case .binary:
             hexDisplay
+        case .sqlite(let tables):
+            SQLiteDisplayView(tables: tables)
         case .error(let msg):
             Text(msg)
                 .foregroundStyle(.red)
@@ -390,6 +584,101 @@ private struct SystemFileResultSheet: View {
         case .high: .orange
         case .critical: .red
         }
+    }
+}
+
+// MARK: - SQLite Display View
+
+/// Displays parsed SQLite tables (e.g. keychain-2.db's GENP/INET/CERT).
+/// Only metadata rows are shown — secret blobs in keychain-2.db are
+/// AES-encrypted and rendered as opaque byte counts.
+struct SQLiteDisplayView: View {
+    let tables: [String: [[String: String]]]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(tables.keys.sorted(), id: \.self) { tableName in
+                SQLiteTableSection(
+                    tableName: tableName,
+                    rows: tables[tableName] ?? []
+                )
+            }
+        }
+    }
+}
+
+private struct SQLiteTableSection: View {
+    let tableName: String
+    let rows: [[String: String]]
+    @State private var isExpanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                isExpanded.toggle()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text("Table: \(tableName)")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text("\(rows.count) rows")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                // Keychain columns of interest, when present.
+                let interesting = [
+                    "AGRPU", "AGRP", "ACC", "ACCT", "SRVR", "SDM", "PDM",
+                    "CDAT", "MDAT", "CLASS", "ENTM", "access_group", "account", "service"
+                ]
+                ForEach(rows.indices, id: \.self) { i in
+                    SQLiteRowView(row: rows[i], interestingKeys: interesting)
+                        .padding(.leading, 14)
+                }
+            }
+        }
+        .padding(8)
+        .background(Color.gray.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct SQLiteRowView: View {
+    let row: [String: String]
+    let interestingKeys: [String]
+
+    /// Pull the most informative columns for the row subtitle.
+    private var summary: String {
+        for key in interestingKeys where row[key] != nil {
+            if let v = row[key], !v.isEmpty {
+                let display = v.count > 60 ? String(v.prefix(60)) + "…" : v
+                return "\(key)=\(display)"
+            }
+        }
+        // Fallback: first non-empty value.
+        if let first = row.values.first(where: { !$0.isEmpty }) {
+            let display = first.count > 60 ? String(first.prefix(60)) + "…" : first
+            return display
+        }
+        return "—"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Row \(row.count) cols")
+                .font(.caption2.weight(.medium))
+            Text(summary)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+        }
+        .padding(.vertical, 2)
     }
 }
 

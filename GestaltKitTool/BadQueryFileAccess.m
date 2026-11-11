@@ -141,6 +141,21 @@ static BOOL BQIsCriticalSystemPath(NSString *path)
 @end
 
 @implementation BQFileEntry
+
+- (instancetype)initWithName:(NSString *)name
+                    fullPath:(NSString *)fullPath
+                  isDirectory:(BOOL)isDirectory
+                    fileSize:(long long)fileSize {
+    self = [super init];
+    if (self) {
+        _name = [name copy];
+        _fullPath = [fullPath copy];
+        _isDirectory = isDirectory;
+        _fileSize = fileSize;
+    }
+    return self;
+}
+
 @end
 
 #pragma mark - BadQueryFileAccess
@@ -151,6 +166,12 @@ static BOOL BQIsCriticalSystemPath(NSString *path)
 {
     dispatch_queue_t _mutationQueue;
 }
+- (void)recursiveCollect:(NSString *)path
+                    depth:(NSInteger)depth
+                 maxDepth:(NSInteger)maxDepth
+        allowInodeFallback:(BOOL)allowInodeFallback
+                  visited:(NSMutableSet<NSString *> *)visited
+                    into:(NSMutableArray<BQFileEntry *> *)collector;
 @end
 
 @implementation BadQueryFileAccess
@@ -263,6 +284,26 @@ static BOOL BQIsCriticalSystemPath(NSString *path)
 
 - (NSArray<BQFileEntry *> *)listDirectoryAtPath:(NSString *)path
                                            error:(NSError **)error
+{
+    // Full listing including the fsgetpath inode-scan fallback.
+    return [self listDirectoryInternal:path
+                          allowInodeFallback:YES
+                                error:error];
+}
+
+- (NSArray<BQFileEntry *> *)listDirectoryNoFallbackAtPath:(NSString *)path
+                                                    error:(NSError **)error
+{
+    // Skips Phase 3 (350K-inode fsgetpath scan) — used by bulk loops
+    // where a denial should simply mean "skip this container".
+    return [self listDirectoryInternal:path
+                          allowInodeFallback:NO
+                                error:error];
+}
+
+- (NSArray<BQFileEntry *> *)listDirectoryInternal:(NSString *)path
+                              allowInodeFallback:(BOOL)allowInodeFallback
+                                            error:(NSError **)error
 {
     if (!path.isAbsolutePath) {
         if (error) *error = [self errorWithCode:1
@@ -432,6 +473,11 @@ static BOOL BQIsCriticalSystemPath(NSString *path)
     // This path exists for completeness; in practice most containers
     // list successfully in Phase 1 or 2.
     // ——————————————————————————————————————————————————————————
+    if (!allowInodeFallback) {
+        if (error) *error = [self errorWithCode:2
+            message:@"Directory listing denied (no inode fallback)."];
+        return @[];
+    }
     NSArray<NSString *> *childPaths = bad_query_list_directory(path, 350000);
 
     if (childPaths.count == 0) {
@@ -632,6 +678,29 @@ static BOOL BQIsCriticalSystemPath(NSString *path)
                                        maxDepth:(NSInteger)maxDepth
                                           error:(NSError **)error
 {
+    return [self recursiveListInternal:path
+                             maxDepth:maxDepth
+                    allowInodeFallback:YES
+                                 error:error];
+}
+
+- (NSArray<BQFileEntry *> *)recursiveListNoFallbackAtPath:(NSString *)path
+                                                 maxDepth:(NSInteger)maxDepth
+                                                    error:(NSError **)error
+{
+    return [self recursiveListInternal:path
+                             maxDepth:maxDepth
+                    allowInodeFallback:NO
+                                 error:error];
+}
+
+/// Shared body. When allowInodeFallback is NO, recursiveCollect uses
+/// listDirectoryNoFallbackAtPath: so a denied lease prunes the subtree.
+- (NSArray<BQFileEntry *> *)recursiveListInternal:(NSString *)path
+                                         maxDepth:(NSInteger)maxDepth
+                                allowInodeFallback:(BOOL)allowInodeFallback
+                                             error:(NSError **)error
+{
     if (!path.isAbsolutePath) {
         if (error) *error = [self errorWithCode:1
                                          message:@"An absolute path is required."];
@@ -645,6 +714,7 @@ static BOOL BQIsCriticalSystemPath(NSString *path)
     [self recursiveCollect:path
                      depth:0
                    maxDepth:maxDepth
+                allowInodeFallback:allowInodeFallback
                     visited:visited
                       into:allEntries];
     if (error) *error = nil;
@@ -656,7 +726,8 @@ static BOOL BQIsCriticalSystemPath(NSString *path)
 - (void)recursiveCollect:(NSString *)path
                     depth:(NSInteger)depth
                  maxDepth:(NSInteger)maxDepth
-                visited:(NSMutableSet<NSString *> *)visited
+        allowInodeFallback:(BOOL)allowInodeFallback
+                  visited:(NSMutableSet<NSString *> *)visited
                     into:(NSMutableArray<BQFileEntry *> *)collector
 {
     if (maxDepth >= 0 && depth > maxDepth) return;
@@ -692,7 +763,9 @@ static BOOL BQIsCriticalSystemPath(NSString *path)
     [visited addObject:resolvedPath];
 
     NSError *error = nil;
-    NSArray<BQFileEntry *> *entries = [self listDirectoryAtPath:path error:&error];
+    NSArray<BQFileEntry *> *entries = allowInodeFallback
+        ? [self listDirectoryAtPath:path error:&error]
+        : [self listDirectoryNoFallbackAtPath:path error:&error];
     if (error) return;
 
     for (BQFileEntry *entry in entries) {
@@ -702,6 +775,7 @@ static BOOL BQIsCriticalSystemPath(NSString *path)
             [self recursiveCollect:entry.fullPath
                             depth:depth + 1
                          maxDepth:maxDepth
+                  allowInodeFallback:allowInodeFallback
                           visited:visited
                             into:collector];
         }
@@ -772,9 +846,11 @@ static BOOL BQIsCriticalSystemPath(NSString *path)
     }
 
     NSError *listError = nil;
-    NSArray<BQFileEntry *> *entries = [self recursiveListAtPath:sourcePath
-                                                       maxDepth:10
-                                                          error:&listError];
+    // No-fallback: bulk recursive copy over container trees must not
+    // trigger a 350K-inode fsgetpath scan per denied subtree.
+    NSArray<BQFileEntry *> *entries = [self recursiveListNoFallbackAtPath:sourcePath
+                                                                 maxDepth:10
+                                                                    error:&listError];
     if (listError) {
         if (error) *error = listError;
         return -1;
@@ -882,9 +958,12 @@ static BOOL BQIsCriticalSystemPath(NSString *path)
     __block NSInteger result = 0;
     __block NSError *blockError = nil;
     dispatch_sync(_mutationQueue, ^{
+        // No-fallback: deleting a cache tree recurses per-subdirectory;
+        // a denied lease must mean "skip this subtree", never a
+        // 350K-inode fsgetpath scan.
         NSError *listError = nil;
-        NSArray<BQFileEntry *> *entries = [self listDirectoryAtPath:path
-                                                               error:&listError];
+        NSArray<BQFileEntry *> *entries = [self listDirectoryNoFallbackAtPath:path
+                                                                         error:&listError];
         if (listError) {
             blockError = listError;
             result = -1;
@@ -1034,6 +1113,44 @@ static BOOL BQIsCriticalSystemPath(NSString *path)
     return [NSError errorWithDomain:@"com.wesk.vtool.badqueryfile"
                                 code:code
                             userInfo:@{NSLocalizedDescriptionKey: message ?: @""}];
+}
+
+- (int)probeOpenModesAtPath:(NSString *)path
+{
+    if (!path.isAbsolutePath) return 0;
+
+    NSString *real = BQNormalizeForStat(path);
+    if (real.length == 0) return 0;
+    const char *cpath = [real fileSystemRepresentation];
+    if (!cpath) return 0;
+
+    int mask = 0;
+    const int modes[3] = { O_RDONLY, O_WRONLY, O_RDWR };
+    // Pass 1: direct open (no lease) — reveals plain DAC/MAC policy.
+    for (int i = 0; i < 3; i++) {
+        int fd = open(cpath, modes[i] | O_CLOEXEC);
+        if (fd >= 0) {
+            mask |= (1 << i) | (1 << (i + 3)); // direct + leased bit
+            close(fd);
+        }
+    }
+
+    // Pass 2: under a worse_query lease (if one can be acquired).
+    BadQueryLease *lease = [BadQueryLease leaseForPath:real error:nil];
+    if (lease) {
+        for (int i = 0; i < 3; i++) {
+            int fd = open(cpath, modes[i] | O_CLOEXEC);
+            if (fd >= 0) {
+                mask |= (1 << i);
+                close(fd);
+            } else {
+                GKTLLog("probeOpenModes(leased) mode=%d errno=%d (%s) path=%s",
+                        i, errno, strerror(errno), cpath);
+            }
+        }
+        [lease invalidate];
+    }
+    return mask;
 }
 
 @end

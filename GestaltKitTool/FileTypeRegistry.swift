@@ -51,10 +51,13 @@ enum FileTypeRegistry {
         switch ext.lowercased() {
         case "plist":   return .plist
         case "json":    return .json
-        case "sqlite", "db": return .database
-        case "txt", "log": return .text
-        case "png", "jpg", "jpeg", "gif", "heic": return .image
-        case "xml":     return .xml
+        case "sqlite", "db", "sqlitedb", "db-wal", "db-shm": return .database
+        case "txt", "log", "md", "markdown", "csv", "tsv",
+             "ini", "cfg", "conf", "yaml", "yml", "properties",
+             "html", "htm", "css", "js", "ts", "swift", "m", "h",
+             "sh", "py", "rb", "java", "jsonl", "strings": return .text
+        case "png", "jpg", "jpeg", "gif", "heic", "webp", "tiff", "tif", "bmp": return .image
+        case "xml", "xcodeproj", "storyboard", "xib": return .xml
         default:        return nil
         }
     }
@@ -111,13 +114,25 @@ enum FileTypeRegistry {
         switch ext.lowercased() {
         case "plist":   return String(localized: "Property List")
         case "json":    return String(localized: "JSON")
-        case "sqlite", "db": return String(localized: "SQLite Database")
+        case "sqlite", "db", "sqlitedb", "db-wal", "db-shm": return String(localized: "SQLite Database")
         case "txt", "log": return String(localized: "Text")
+        case "md", "markdown": return String(localized: "Markdown")
+        case "csv", "tsv": return String(localized: "CSV Data")
         case "png":     return String(localized: "PNG Image")
         case "jpg", "jpeg": return String(localized: "JPEG Image")
         case "heic":    return String(localized: "HEIC Image")
         case "gif":     return String(localized: "GIF Image")
+        case "webp":    return String(localized: "WebP Image")
+        case "tiff", "tif": return String(localized: "TIFF Image")
+        case "bmp":     return String(localized: "BMP Image")
         case "xml":     return String(localized: "XML")
+        case "html", "htm": return String(localized: "HTML")
+        case "yaml", "yml": return String(localized: "YAML")
+        case "css":     return String(localized: "CSS")
+        case "js":      return String(localized: "JavaScript")
+        case "swift":   return String(localized: "Swift Source")
+        case "sh":      return String(localized: "Shell Script")
+        case "strings": return String(localized: "Strings")
         default:        return String(localized: "File")
         }
     }

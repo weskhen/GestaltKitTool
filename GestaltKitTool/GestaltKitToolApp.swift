@@ -36,6 +36,39 @@ struct GestaltKitToolApp: App {
         }
         AutomationCommand.runIfNeeded()
         MemoryPressureMonitor.start()
+
+        // Headless self-test for device validation: 5s after launch, run
+        // the carrier-bundle (IPCC) probe, a keychain reachability probe
+        // and a MobileGestalt dashboard dump; all results are mirrored to
+        // syslog ([GKTL-ObjC] / [GKTL-Keychain] / [GKTL-Dashboard]).
+        // Opt-in only — enable with
+        // `defaults write com.wesk.vtool GKTLAutoProbe -bool YES`.
+        if UserDefaults.standard.object(forKey: "GKTLAutoProbe") as? Bool ?? false {
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 5) {
+                Task { @MainActor in
+                    let model = DiagnosticsModel()
+                    model.runCarrierProbe()
+                }
+                // Keychain reachability probe — fully automated, all
+                // results mirrored to syslog as [GKTL-Keychain].
+                Task { @MainActor in
+                    let probe = KeychainProbeModel()
+                    probe.run()
+                }
+                // Device dashboard dump — mirrors the MobileGestalt
+                // values to syslog as [GKTL-Dashboard] rows.
+                Task { @MainActor in
+                    let dashboard = DeviceDashboardModel()
+                    dashboard.runOnRead = { rows in
+                        for row in rows.prefix(25) {
+                            gktlLog("[GKTL-Dashboard] ROW \(row.key) = \(row.displayValue)")
+                        }
+                        gktlLog("[GKTL-Dashboard] total rows=\(rows.count)")
+                    }
+                    dashboard.run()
+                }
+            }
+        }
     }
 
     var body: some Scene {

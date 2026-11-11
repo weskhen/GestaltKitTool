@@ -5,3 +5,4 @@
 #import "GestaltAccess.h"
 #import "BadQueryBridge.h"
 #import "BadQueryFileAccess.h"
+#import "WorseQueryProbe.h"

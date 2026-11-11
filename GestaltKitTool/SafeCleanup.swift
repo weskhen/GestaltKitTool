@@ -11,16 +11,60 @@ import SwiftUI
 
 // MARK: - Cleanup Item
 
+/// Additional deep cache directories scanned per app container.
+/// All are safe to delete (iOS regenerates them); none contain user data.
+struct DeepCacheTarget: Identifiable {
+    let subpath: String          // path relative to the container root
+    let labelKey: String         // localized display name
+    let systemImage: String      // SF Symbol for the row
+    /// Optional short path shown in scope view. Defaults to subpath.
+    let pathHint: String
+
+    init(subpath: String, labelKey: String, systemImage: String, pathHint: String? = nil) {
+        self.subpath = subpath
+        self.labelKey = labelKey
+        self.systemImage = systemImage
+        self.pathHint = pathHint ?? subpath
+    }
+
+    var id: String { subpath }
+
+    /// Localized display name resolved at render time.
+    var label: String { String(localized: String.LocalizationValue(labelKey)) }
+
+    static let all: [DeepCacheTarget] = [
+        .init(subpath: "Library/SplashBoard/Snapshots",
+              labelKey: "Snapshots",
+              systemImage: "camera.on.rectangle"),
+        .init(subpath: "Library/WebKit",
+              labelKey: "WebKit Data",
+              systemImage: "network"),
+        .init(subpath: "Library/Caches/Snapshots",
+              labelKey: "Snapshot Caches",
+              systemImage: "photo.stack"),
+        .init(subpath: "Logs",
+              labelKey: "Logs",
+              systemImage: "doc.text"),
+    ]
+}
+
 /// Represents one app's cleanable cache directories.
 struct CleanupItem: Identifiable, Hashable {
     let id: String              // bundle identifier
     let displayName: String
     let cachesPath: String?     // Library/Caches
     let tmpPath: String?        // tmp/
+    /// Extra deep-cache targets discovered for this app
+    /// (subpath → absolute path).
+    let deepCaches: [String: String]
     var cachesSize: Int64 = 0
     var tmpSize: Int64 = 0
+    /// Sizes for each deep-cache subpath (matches deepCaches keys).
+    var deepCacheSizes: [String: Int64] = [:]
 
-    nonisolated var totalSize: Int64 { cachesSize + tmpSize }
+    nonisolated var totalSize: Int64 {
+        cachesSize + tmpSize + deepCacheSizes.values.reduce(0, +)
+    }
     nonisolated var sizeFormatted: String {
         ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
     }
@@ -79,82 +123,125 @@ final class SafeCleanupModel: ObservableObject {
     }
 
     /// Discovers all apps and computes their cache sizes.
+    ///
+    /// Uses no-fallback listings throughout: the container root holds
+    /// 12,000+ UUIDs (mostly system containers with denied leases), and
+    /// each denial used to trigger a 350K-inode fsgetpath scan. Results
+    /// stream to the UI in throttled 0.5s batches.
     func discoverApps() {
+        guard !isLoading else { return }
         isLoading = true
         loadingProgress = ""
         errorMessage = nil
+        items = []
 
-        Task {
-            let discovered = await performDiscovery()
-            self.items = discovered
-            self.isLoading = false
-        }
-    }
+        // Background consumption; the producer runs on its own detached
+        // task so items arrive while the scan is still in progress.
+        Task.detached(priority: .userInitiated) { [weak self] in
+            var lastFlush = Date()
+            var pending: [CleanupItem] = []
 
-    // MARK: Discovery (background)
-
-    private nonisolated func performDiscovery() async -> [CleanupItem] {
-        let fa = BadQueryFileAccess.shared()
-
-        // Enumerate app data containers.
-        let containersPath = ContainerMetadata.appDataRoot
-        let containerEntries = fa.listDirectory(atPath: containersPath, error: nil)
-
-        var results: [CleanupItem] = []
-        var idx = 0
-
-        for entry in containerEntries where entry.isDirectory {
-            idx += 1
-            let uuid = entry.name
-
-            // duplicated inline metadata parsing.
-            let bundleId = ContainerMetadata.bundleId(
-                fileAccess: fa,
-                containerPath: entry.fullPath
-            )
-            var displayName = uuid
-
-            if let bid = bundleId {
-                displayName = bid.split(separator: ".").last.map(String.init) ?? bid
-            }
-
-            // Compute Caches size.
-            let cachesPath = entry.fullPath + "/Library/Caches"
-            let tmpPath = entry.fullPath + "/tmp"
-
-            let cachesSize = ContainerMetadata.totalSize(
-                fileAccess: fa, path: cachesPath, maxDepth: 5
-            )
-            let tmpSize = ContainerMetadata.totalSize(
-                fileAccess: fa, path: tmpPath, maxDepth: 5
-            )
-
-            // Skip apps with nothing to clean.
-            if cachesSize > 0 || tmpSize > 0 {
-                let item = CleanupItem(
-                    id: bundleId ?? uuid,
-                    displayName: displayName,
-                    cachesPath: cachesSize > 0 ? cachesPath : nil,
-                    tmpPath: tmpSize > 0 ? tmpPath : nil,
-                    cachesSize: cachesSize,
-                    tmpSize: tmpSize
-                )
-                results.append(item)
-            }
-
-            // Update loading progress periodically.
-            if idx % 20 == 0 {
-                let prog = "\(idx) containers scanned"
-                await MainActor.run {
-                    self.loadingProgress = prog
+            func flush(force: Bool, isLast: Bool = false) async {
+                let now = Date()
+                guard force || now.timeIntervalSince(lastFlush) >= 0.5 else {
+                    if isLast { await MainActor.run { self?.isLoading = false } }
+                    return
+                }
+                lastFlush = now
+                let batch = pending
+                pending = []
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    if !batch.isEmpty {
+                        self.items.append(contentsOf: batch)
+                        self.items.sort { $0.totalSize > $1.totalSize }
+                        self.loadingProgress = String(
+                            format: String(localized: "%d apps found"),
+                            self.items.count)
+                    }
+                    if isLast { self.isLoading = false }
                 }
             }
-        }
 
-        // Sort by size descending.
-        results.sort { $0.totalSize > $1.totalSize }
-        return results
+            for await item in Self.performDiscoveryStream() {
+                pending.append(item)
+                await flush(force: false)
+            }
+            await flush(force: true, isLast: true)
+        }
     }
+
+    // MARK: Discovery (background, streaming)
+
+    /// Yields one CleanupItem per cleanable app container.
+    /// Uses the no-fallback listing throughout: a denied lease yields
+    /// an empty listing (skip) instead of an expensive inode scan.
+    private nonisolated static func performDiscoveryStream() -> AsyncStream<CleanupItem> {
+        AsyncStream { continuation in
+            // The build closure runs synchronously at init, so the scan
+            // loop itself must hop to a detached task — otherwise the
+            // entire container walk finishes before the first await.
+            Task.detached(priority: .userInitiated) {
+                let fa = BadQueryFileAccess.shared()
+                let containersPath = ContainerMetadata.appDataRoot
+                let containerEntries = fa.listDirectory(atPath: containersPath, error: nil)
+
+                for entry in containerEntries where entry.isDirectory {
+                    let uuid = entry.name
+
+                    // Fast pre-filter: if we cannot list the container root,
+                    // we cannot clean it — skip silently.
+                    let rootEntries = fa.listDirectoryNoFallback(
+                        atPath: entry.fullPath, error: nil)
+                    guard !rootEntries.isEmpty else { continue }
+
+                    // Resolve the bundle ID from the container's metadata.
+                    let bundleId = ContainerMetadata.bundleId(
+                        fileAccess: fa,
+                        containerPath: entry.fullPath
+                    )
+                    var displayName = uuid
+                    if let bid = bundleId {
+                        displayName = bid.split(separator: ".").last.map(String.init) ?? bid
+                    }
+
+                    // Compute sizes (no-fallback listings only).
+                    let cachesPath = entry.fullPath + "/Library/Caches"
+                    let tmpPath = entry.fullPath + "/tmp"
+                    let cachesSize = ContainerMetadata.totalSize(fileAccess: fa, path: cachesPath)
+                    let tmpSize = ContainerMetadata.totalSize(fileAccess: fa, path: tmpPath)
+
+                    // Deep cache targets (snapshots, WebKit data, logs…).
+                    var deepCaches: [String: String] = [:]
+                    var deepCacheSizes: [String: Int64] = [:]
+                    for target in DeepCacheTarget.all {
+                        let fullPath = entry.fullPath + "/" + target.subpath
+                        let size = ContainerMetadata.totalSize(fileAccess: fa, path: fullPath)
+                        if size > 0 {
+                            deepCaches[target.subpath] = fullPath
+                            deepCacheSizes[target.subpath] = size
+                        }
+                    }
+
+                    // Only yield apps with something to clean.
+                    if cachesSize > 0 || tmpSize > 0 || !deepCacheSizes.isEmpty {
+                        continuation.yield(CleanupItem(
+                            id: bundleId ?? uuid,
+                            displayName: displayName,
+                            cachesPath: cachesSize > 0 ? cachesPath : nil,
+                            tmpPath: tmpSize > 0 ? tmpPath : nil,
+                            deepCaches: deepCaches,
+                            cachesSize: cachesSize,
+                            tmpSize: tmpSize,
+                            deepCacheSizes: deepCacheSizes
+                        ))
+                    }
+                }
+                continuation.finish()
+            }
+        }
+    }
+
 
     // MARK: Cleanup execution
 
@@ -197,6 +284,13 @@ final class SafeCleanupModel: ObservableObject {
                 if let tmpPath = item.tmpPath {
                     itemError = nil  // reset for tmp check
                     let del = fileAccess.deleteDirectoryContents(atPath: tmpPath, maxItems: 0, error: &itemError)
+                    if del >= 0 { itemDeletedCount += Int(del) }
+                }
+
+                // Clear deep cache targets (snapshots, WebKit, logs…).
+                for (_, deepPath) in item.deepCaches.sorted(by: { $0.key < $1.key }) {
+                    itemError = nil
+                    let del = fileAccess.deleteDirectoryContents(atPath: deepPath, maxItems: 0, error: &itemError)
                     if del >= 0 { itemDeletedCount += Int(del) }
                 }
 
@@ -254,6 +348,8 @@ struct SafeCleanupView: View {
             } else if model.items.isEmpty && !model.isLoading {
                 emptyView
             } else {
+                // While still scanning, keep the list visible with a
+                // subtle progress header instead of blocking on a spinner.
                 contentView
             }
         }
@@ -322,6 +418,28 @@ struct SafeCleanupView: View {
 
     private var contentView: some View {
         List {
+            // Streaming scan progress (non-blocking banner).
+            if model.isLoading {
+                Section {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text(model.loadingProgress.isEmpty
+                             ? String(localized: "Scanning app containers…")
+                             : model.loadingProgress)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                }
+            }
+
+            // Cleanup scope explanation.
+            Section {
+                scopeView
+            } footer: {
+                Text(String(localized: "Only cache-class directories are touched. Tap rows to select apps; leave nothing selected to clean all."))
+            }
+
             // Progress section.
             if model.isCleaning || model.progress.isComplete {
                 Section {
@@ -349,7 +467,7 @@ struct SafeCleanupView: View {
             } header: {
                 Text(String(localized: "Summary"))
             } footer: {
-                Text(String(localized: "Safe Cleanup only removes Library/Caches and tmp/ directories. Your app data, documents, and preferences are never touched."))
+                Text(String(localized: "Safe Cleanup removes caches, tmp, app snapshots, WebKit data, and logs. Your app data, documents, and preferences are never touched."))
             }
 
             // Per-app list.
@@ -379,6 +497,52 @@ struct SafeCleanupView: View {
             }
         }
         .listStyle(.insetGrouped)
+    }
+
+    // MARK: Scope explanation
+
+    private var scopeView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(String(localized: "What gets cleaned"))
+                .font(.subheadline.weight(.semibold))
+            ForEach(deepTargetsWithBasics) { target in
+                HStack(spacing: 8) {
+                    Image(systemName: target.systemImage)
+                        .frame(width: 22)
+                        .foregroundStyle(.secondary)
+                    Text(target.label)
+                    Spacer()
+                    Text(target.pathHint)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.tertiary)
+                }
+                .font(.subheadline)
+            }
+            Divider()
+            Text(String(localized: "Never touched"))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.green)
+            Text(String(localized: "Documents, preferences, keychains, photos, and app data are never modified."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(String(localized: "System-level caches (e.g. Safari system data) live in read-only protected containers and cannot be cleaned by any sandboxed tool."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+
+    /// The five cleaned categories shown in the scope view:
+    /// Caches, tmp, plus the deep targets.
+    private var deepTargetsWithBasics: [DeepCacheTarget] {
+        var targets: [DeepCacheTarget] = [
+            .init(subpath: "Library/Caches", labelKey: "Caches", systemImage: "cylinder.split.1x2", pathHint: "Library/Caches"),
+            .init(subpath: "tmp", labelKey: "Temporary Files", systemImage: "clock.arrow.circlepath", pathHint: "tmp"),
+        ]
+        targets.append(contentsOf: DeepCacheTarget.all.map {
+            .init(subpath: $0.subpath, labelKey: $0.labelKey, systemImage: $0.systemImage)
+        })
+        return targets
     }
 }
 
@@ -420,6 +584,19 @@ private struct CleanupRowView: View {
                             Text(item.tmpSizeFormatted)
                         } icon: {
                             Image(systemName: "clock.arrow.circlepath")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    // Deep-cache badges (snapshots / WebKit / logs).
+                    ForEach(DeepCacheTarget.all.filter { item.deepCacheSizes[$0.subpath] != nil }) { target in
+                        Label {
+                            Text(ByteCountFormatter.string(
+                                fromByteCount: item.deepCacheSizes[target.subpath] ?? 0,
+                                countStyle: .file
+                            ))
+                        } icon: {
+                            Image(systemName: target.systemImage)
                         }
                         .font(.caption)
                         .foregroundStyle(.secondary)

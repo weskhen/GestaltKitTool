@@ -122,7 +122,7 @@ struct OnboardingView: View {
                 )
                 riskBullet(
                     icon: "lock.shield",
-                    text: String(localized: "This tool works via a sandbox escape (bad_query). It does not require a jailbreak, but it relies on specific iOS build vulnerabilities that may be patched in future updates.")
+                    text: String(localized: "This tool works via sandbox escapes (bad_query / worse_query). It does not require a jailbreak, but it relies on specific iOS build vulnerabilities that may be patched in future updates. On iOS 27.2+, only worse_query is active — it additionally requires the app's App Group entitlement.")
                 )
             }
             .frame(maxWidth: .infinity, alignment: .leading)

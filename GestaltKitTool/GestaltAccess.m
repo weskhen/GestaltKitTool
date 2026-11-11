@@ -9,6 +9,10 @@
 #import "GestaltAccess.h"
 #import "BadQueryBridge.h"
 
+#import <os/log.h>
+
+#define GKTLLogObjC(fmt, ...) os_log(OS_LOG_DEFAULT, "%{public}s", [[NSString stringWithFormat:@"[GKTL-ObjC] " fmt, ##__VA_ARGS__] UTF8String])
+
 #import <errno.h>
 #import <fcntl.h>
 #import <sys/stat.h>
@@ -40,7 +44,7 @@ static BOOL GestaltCanOpenReadWrite(NSString *path)
                   O_RDWR | O_CLOEXEC | O_NOFOLLOW);
     if (fd < 0) {
         int err = errno;
-        NSLog(@"[GKTL-ObjC] GestaltCanOpenReadWrite FAILED for %@ (errno=%d: %s)",
+        GKTLLogObjC(@"GestaltCanOpenReadWrite FAILED for %@ (errno=%d: %s)",
               path, err, strerror(err));
         return NO;
     }
@@ -58,12 +62,12 @@ static BOOL GestaltCanOpenReadOnly(NSString *path)
     int fd = open(pathC, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     if (fd < 0) {
         int err = errno;
-        NSLog(@"[GKTL-ObjC] GestaltCanOpenReadOnly FAILED for %@ (errno=%d: %s)",
+        GKTLLogObjC(@"GestaltCanOpenReadOnly FAILED for %@ (errno=%d: %s)",
               path, err, strerror(err));
         return NO;
     }
     close(fd);
-    NSLog(@"[GKTL-ObjC] GestaltCanOpenReadOnly OK for %@", path);
+    GKTLLogObjC(@"GestaltCanOpenReadOnly OK for %@", path);
     return YES;
 }
 
@@ -199,15 +203,23 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
     NSString *build = self.currentOSBuild;
 
     // bad_query author declares support for iOS 26.0 - 26.6.1 / 27.0b4.
-    // Note: iOS 26 support is per author's claim, not fully tested on all builds.
-    // User feedback on actual compatibility is welcome; will adjust if Apple patches bad_query.
+    // worse_query (bad_query's successor, also by forcequit) extends
+    // coverage to iOS 26.0 - 26.7.2 / 27.2 (27.3 beta reported working).
+    // We therefore accept the union of both ranges: bad_query is tried
+    // first and worse_query is the automatic fallback when bad_query is
+    // rejected or times out.
     if (version.majorVersion == 26) {
-        if (version.minorVersion > 6) return NO;
-        if (version.minorVersion == 6 && version.patchVersion > 1) return NO;
+        if (version.minorVersion > 7) return NO;
+        if (version.minorVersion == 7 && version.patchVersion > 2) return NO;
         return YES;
     }
-    // iOS 27 is still in beta; keep precise build whitelist to avoid untested versions.
+    // iOS 27: bad_query whitelist (27 beta 1-4) plus worse_query support
+    // (27.2 stable, 27.3 beta). 27.0/27.1 are in neither range, and
+    // versions past 27.3 are untested by both PoCs — reject until verified.
     if (version.majorVersion == 27) {
+        if (version.minorVersion == 2) return YES;
+        if (version.minorVersion == 3) return YES;
+        // bad_query beta whitelist (27.0 betas only)
         return [build isEqualToString:@"24A5355q"] || // iOS 27 beta 1
                [build isEqualToString:@"24A5370h"] || // iOS 27 beta 2
                [build isEqualToString:@"24A5380h"] || // iOS 27 beta 3
@@ -273,7 +285,7 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
     dispatch_sync(_stateQueue, ^{
         if (!GestaltAccess.isRunningSupportedOS) {
             blockError = GestaltError(0, NSLocalizedString(
-                @"GestaltKitTool currently supports iOS 26.0–26.6.1 and iOS 27 beta 1–4.", nil));
+                @"GestaltKitTool currently supports iOS 26.0–26.7.2 and iOS 27 beta 1–4 / 27.2 / 27.3 beta.", nil));
             result = NO;
             return;
         }
@@ -323,7 +335,7 @@ static BOOL GestaltWriteAll(int fd, NSData *data)
         // so the user can at least view the plist; write operations
         // (saveGestalt:) will fail later with a clear EACCES/EINVAL.
         if (GestaltCanOpenReadOnly(badQueryPlist)) {
-            NSLog(@"[GKTL-ObjC] GestaltAccess: read-write open failed but read-only succeeded — connecting in read-only mode");
+            GKTLLogObjC(@"GestaltAccess: read-write open failed but read-only succeeded — connecting in read-only mode");
             dispatch_sync(_stateQueue, ^{
                 _activeBadQueryLease = badQueryLease;
                 self.isConnected = YES;

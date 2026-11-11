@@ -55,7 +55,7 @@ private struct UnsupportedOSView: View {
                 .foregroundStyle(.secondary)
             Text(String(localized: "Unsupported iOS Version"))
                 .font(.title2.weight(.semibold))
-            Text(String(localized: "GestaltKitTool currently supports iOS 26.0–26.6.1 and iOS 27 beta 1–4."))
+            Text(String(localized: "GestaltKitTool currently supports iOS 26.0–26.7.2 and iOS 27 beta 1–4 / 27.2 / 27.3 beta."))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
         }
@@ -71,8 +71,17 @@ private struct TweakWorkbench: View {
     @State private var modelNameValidation: ModelNameValidator.Result? = nil
     
     @State private var showsApplyConfirm = false
+
+    @State private var showsAIWizard = false
     
     @State private var showsApplyPreview = false
+
+    /// Set by the preview sheet's "Continue" action; consumed in the sheet's
+    /// onDismiss so the confirmation alert is presented only after the sheet
+    /// has fully dismissed. Presenting it earlier (same runloop or mid-animation)
+    /// leaves the presentation state machine in a broken state where the Cancel
+    /// button stops responding.
+    @State private var confirmAfterPreviewDismiss = false
     
     @State private var showsDiagnosticsFromError = false
 
@@ -115,10 +124,15 @@ private struct TweakWorkbench: View {
                 }
             }
             
-            .sheet(isPresented: $showsApplyPreview) {
-                ApplyPreviewSheet(viewModel: viewModel) {
-                    showsApplyPreview = false
+            .sheet(isPresented: $showsApplyPreview, onDismiss: {
+                if confirmAfterPreviewDismiss {
+                    confirmAfterPreviewDismiss = false
                     showsApplyConfirm = true
+                }
+            }) {
+                ApplyPreviewSheet(viewModel: viewModel) {
+                    confirmAfterPreviewDismiss = true
+                    showsApplyPreview = false
                 }
                 .presentationDetents([.medium, .large])
             }
@@ -136,15 +150,16 @@ private struct TweakWorkbench: View {
                 }
             }
             
-            .confirmationDialog(
+            .alert(
                 String(localized: "Apply Changes?"),
-                isPresented: $showsApplyConfirm,
-                titleVisibility: .visible
+                isPresented: $showsApplyConfirm
             ) {
                 Button(String(localized: "Apply & Respring")) {
                     viewModel.applySelectedTweaks()
                 }
-                Button(String(localized: "Cancel"), role: .cancel) {}
+                Button(String(localized: "Cancel"), role: .cancel) {
+                    showsApplyConfirm = false
+                }
             } message: {
                 Text(String(format: String(localized: "%d changes will be written to the MobileGestalt plist. An automatic backup will be created. After writing, your device will respring — all apps will close temporarily."), viewModel.stagedChangeCount))
             }
@@ -188,6 +203,29 @@ private struct TweakWorkbench: View {
                         }
                     }
                 }
+
+                aiWizardEntry
+            }
+        }
+        .sheet(isPresented: $showsAIWizard) {
+            SiriAIWizardView()
+                .environmentObject(viewModel)
+        }
+    }
+
+    private var aiWizardEntry: some View {
+        Button {
+            showsAIWizard = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(.yellow)
+                Text(String(localized: "Siri AI Setup Guide"))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -407,6 +445,7 @@ private struct TweakWorkbench: View {
 private struct ApplyPreviewSheet: View {
     @ObservedObject var viewModel: GestaltViewModel
     let onConfirm: () -> Void
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
@@ -458,7 +497,7 @@ private struct ApplyPreviewSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "Cancel"), role: .cancel) {}
+                    Button(String(localized: "Cancel"), role: .cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(String(localized: "Continue")) { onConfirm() }
@@ -2111,13 +2150,13 @@ private struct SettingsTab: View {
                 } header: {
                     Text("Troubleshooting")
                 } footer: {
-                    Text("Tests bad_query availability, sandbox lease, container discovery, and file read operations.")
+                    Text("Tests bad_query / worse_query availability, sandbox lease, container discovery, and file read operations.")
                 }
 
                 
                 Section {
                     LabeledContent("App Name", value: "GestaltKitTool")
-                    LabeledContent("Supported iOS", value: "26.0–26.6.1, 27 beta 1–4")
+                    LabeledContent("Supported iOS", value: "26.0–26.7.2, 27 beta 1–4 / 27.2 / 27.3 beta")
                     Button {
                         showsOnboarding = true
                     } label: {

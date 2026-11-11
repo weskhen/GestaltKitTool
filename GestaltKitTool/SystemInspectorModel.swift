@@ -117,6 +117,7 @@ struct SystemFileResult: Identifiable {
         case hex(String)
         case json(Any)
         case binary(Data)
+        case sqlite(tables: [String: [[String: String]]])
         case error(String)
     }
 
@@ -137,6 +138,9 @@ struct SystemFileResult: Identifiable {
             return String(format: String(localized: "JSON (%d bytes)"), data.count)
         case .binary:
             return String(format: String(localized: "Binary data (%d bytes)"), data.count)
+        case .sqlite(let tables):
+            let rows = tables.values.map(\.count).reduce(0, +)
+            return String(format: String(localized: "SQLite (%d tables, %d rows)"), tables.count, rows)
         case .error(let msg):
             return msg
         }
@@ -207,6 +211,42 @@ final class SystemInspectorModel: ObservableObject {
             description: String(localized: "System data containers (iOS 27). Contains daemon sandboxes."),
             riskLevel: .high,
             parser: .auto
+        ),
+        .init(
+            id: "keychain_db",
+            category: .keychain,
+            title: "System Keychain Database",
+            path: "/var/Keychains/keychain-2.db",
+            description: String(localized: "Protected by kernel extension policy — read is expected to fail. Listed for boundary documentation."),
+            riskLevel: .critical,
+            parser: .auto
+        ),
+        .init(
+            id: "tcc_db",
+            category: .keychain,
+            title: "TCC Permissions Database",
+            path: "/var/mobile/Library/TCC/TCC.db",
+            description: String(localized: "MAC-blocked at the kernel level (verified) — lists all apps' permission grants if a bypass emerges."),
+            riskLevel: .critical,
+            parser: .auto
+        ),
+        .init(
+            id: "network_prefs",
+            category: .keychain,
+            title: "System Network Configuration",
+            path: "/var/preferences/SystemConfiguration/preferences.plist",
+            description: String(localized: "MAC-blocked at the kernel level (verified) — Wi-Fi/VPN/proxy settings."),
+            riskLevel: .high,
+            parser: .auto
+        ),
+        .init(
+            id: "keychain_keybag",
+            category: .keychain,
+            title: "System Keybag",
+            path: "/var/Keybags/efw_keybag",
+            description: String(localized: "Encrypted keybag protecting keychain encryption keys."),
+            riskLevel: .critical,
+            parser: .hex
         ),
 
         // --- App Sandboxes ---
@@ -294,8 +334,10 @@ final class SystemInspectorModel: ObservableObject {
 
             if let statResult, statResult.isDirectory {
                 // It's a directory — list its contents instead of reading.
+                // No-fallback: this can recurse into system container
+                // trees; a denied lease should skip, not inode-scan.
                 var listError: NSError?
-                let entries = fileAccess.listDirectory(atPath: targetPath, error: &listError)
+                let entries = fileAccess.listDirectoryNoFallback(atPath: targetPath, error: &listError)
 
                 if let listError {
                     let friendly = ErrorHandler.friendlyMessage(for: listError)
@@ -370,10 +412,29 @@ final class SystemInspectorModel: ObservableObject {
     }
 
     private func storeResult(_ result: SystemFileResult, for targetId: String) {
+        gktlLog("[GKTL-Target] id=\(targetId) success=\(result.isSuccess) size=\(result.fileSize) summary=\(result.summary)")
         results.removeAll { $0.target.id == targetId }
         results.insert(result, at: 0)
         isLoading = false
         loadingTargetId = nil
+    }
+
+    // MARK: - SQLite Parsing
+
+    nonisolated private static func parseSQLite(data: Data) -> SystemFileResult.ParsedContent {
+        let parser = SQLiteParser(data: data)
+        let tables = parser.parseTables()
+        var parsed: [String: [[String: String]]] = [:]
+        for table in tables {
+            if table.hasPrefix("sqlite_") { continue }
+            let (_, rows) = parser.parseTable(table)
+            guard !rows.isEmpty else { continue }
+            parsed[table] = rows
+        }
+        guard !parsed.isEmpty else {
+            return .error(String(localized: "SQLite database readable but no user tables found."))
+        }
+        return .sqlite(tables: parsed)
     }
 
     // MARK: - Parsing (static, safe for background threads)
@@ -414,7 +475,11 @@ final class SystemInspectorModel: ObservableObject {
             return .error(String(localized: "Unable to parse as JSON."))
 
         case .auto:
-            // Try plist first, then JSON, then text, then hex.
+            // Try SQLite first — the header magic is unambiguous.
+            if data.count >= 16, String(data: data.prefix(15), encoding: .ascii) == "SQLite format 3" {
+                return Self.parseSQLite(data: data)
+            }
+            // Try plist, then JSON, then text, then hex.
             var format = PropertyListSerialization.PropertyListFormat.binary
             if let plist = try? PropertyListSerialization.propertyList(
                 from: data, options: [], format: &format

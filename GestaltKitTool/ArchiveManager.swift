@@ -335,7 +335,9 @@ enum ArchiveManager {
             throw ArchiveError.sourceIsDirectoryButCouldNotList(fromPath)
         }
         var nsError: NSError?
-        let children = fileAccess.listDirectory(atPath: fromPath, error: &nsError)
+        // No-fallback: bulk copy of a container tree must skip denied
+        // subtrees rather than run a 350K-inode fsgetpath scan each time.
+        let children = fileAccess.listDirectoryNoFallback(atPath: fromPath, error: &nsError)
         if nsError != nil {
             throw ArchiveError.sourceIsDirectoryButCouldNotList(fromPath)
         }

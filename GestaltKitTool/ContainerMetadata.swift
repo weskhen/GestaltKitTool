@@ -20,14 +20,6 @@ enum ContainerMetadata {
 
     /// iOS app data container root.
     nonisolated static let appDataRoot = "/var/mobile/Containers/Data"
-    /// iOS app bundle root.
-    nonisolated static let bundleRoot = "/var/containers/Bundle/Application"
-    /// App group shared container root.
-    nonisolated static let appGroupRoot = "/var/mobile/Containers/Shared/AppGroup"
-    /// Internal daemon container root.
-    nonisolated static let internalDaemonRoot = "/var/mobile/Containers/Data/InternalDaemon"
-    /// PluginKit plugin container root.
-    nonisolated static let pluginKitRoot = "/var/mobile/Containers/Data/PluginKitPlugin"
 
     /// The metadata plist filename used by MobileContainerManager.
     nonisolated static let metadataFilename = ".com.apple.mobile_container_manager.metadata.plist"
@@ -55,11 +47,22 @@ enum ContainerMetadata {
         return plist["MCMMetadataIdentifier"] as? String
     }
 
+    // MARK: - Container Name Validation
+
+    /// True when a directory name looks like an MCM container UUID
+    /// (36 chars, 4 dashes). Shared by all scanner/cleanup loops.
+    static nonisolated func isContainerUUID(_ name: String) -> Bool {
+        name.count == 36 && name.filter { $0 == "-" }.count == 4
+    }
+
     // MARK: - Container Resolution
 
     /// Resolves a bundle ID to its data container path by scanning
     /// `/var/mobile/Containers/Data` subdirectories for a matching
     /// metadata plist. Returns nil if not found.
+    ///
+    /// Uses the no-fallback listing: over 12k containers, a denied
+    /// lease must mean "skip", never a 350K-inode fsgetpath scan.
     static nonisolated func resolveContainerPath(
         fileAccess: BadQueryFileAccess,
         bundleId: String
@@ -74,17 +77,40 @@ enum ContainerMetadata {
         return nil
     }
 
+    /// Finds the system container (under /var/containers/Data/System)
+    /// owned by `bundleId` — e.g. "com.apple.mobileactivationd".
+    /// Single shared implementation (previously duplicated in
+    /// ActivationReport and DeviceDashboard).
+    static nonisolated func findSystemContainer(
+        fileAccess: BadQueryFileAccess,
+        ownerBundleId bundleId: String
+    ) -> (uuid: String, fullPath: String)? {
+        let entries = fileAccess.listDirectory(
+            atPath: "/private/var/containers/Data/System", error: nil)
+        for entry in entries where entry.isDirectory {
+            guard isContainerUUID(entry.name) else { continue }
+            if let bid = self.bundleId(
+                fileAccess: fileAccess, containerPath: entry.fullPath),
+               bid == bundleId {
+                return (entry.name, entry.fullPath as String)
+            }
+        }
+        return nil
+    }
+
     // MARK: - Directory Size
 
     /// Computes the total size (in bytes) and file count of a directory
-    /// tree up to `maxDepth` levels deep. Uses `recursiveList` for
-    /// efficient batch listing.
+    /// tree up to `maxDepth` levels deep. Uses the no-fallback
+    /// recursive listing — callers are bulk operations (safe cleanup,
+    /// app data scan) where a denied lease must mean "skip this
+    /// subtree", never a 350K-inode fsgetpath scan.
     static nonisolated func directorySize(
         fileAccess: BadQueryFileAccess,
         path: String,
         maxDepth: Int = 5
     ) -> (size: Int64, count: Int) {
-        let entries = fileAccess.recursiveList(atPath: path, maxDepth: maxDepth, error: nil)
+        let entries = fileAccess.recursiveListNoFallback(atPath: path, maxDepth: maxDepth, error: nil)
         var totalSize: Int64 = 0
         var totalCount = 0
         for entry in entries where !entry.isDirectory {

@@ -6,6 +6,7 @@
 //
 
 #import "BadQueryBridge.h"
+#import "WorseQueryBridge.h"
 
 #import <dlfcn.h>
 #import <objc/runtime.h>
@@ -22,14 +23,12 @@
 // query parameters and per-stage failure state so the user can pinpoint
 // which step ContainerManager rejects on early iOS 26 builds.
 //
-// NOTE: os_log requires compile-time-constant format strings and treats
-// `%@` as private by default (rendered as `<private>`). We use NSLog here
-// because the diagnostic strings mix NSString (`%@`) and C string (`%s`)
-// specifiers, and os_log's static-analysis of format strings rejects
-// non-literal `%s` arguments that come from variables. NSLog accepts both
-// without complaints and the output is still visible in Console.app and
-// Xcode's device log.
-#define GKTLLogObjC(fmt, ...) NSLog(@"[GKTL-ObjC] " fmt, ##__VA_ARGS__)
+// NOTE: os_log format strings treat `%@` as private by default (rendered
+// as `<private>`). For diagnostics we need the actual paths visible, so
+// every format specifier that carries a path or identifier is explicitly
+// marked %{public}. Dynamic paths are safe to publish: they are not user
+// content, and the logs are only read from Console.app on this device.
+#define GKTLLogObjC(fmt, ...) os_log(OS_LOG_DEFAULT, "%{public}s", [[NSString stringWithFormat:@"[GKTL-ObjC] " fmt, ##__VA_ARGS__] UTF8String])
 
 static const uint64_t kBadQueryContainerClass = 13;
 static const uint64_t kBadQueryPart = 3;
@@ -195,6 +194,10 @@ BOOL BadQueryBridgeAvailable(void)
 @implementation BadQueryLease
 {
     int64_t _sandboxHandle;
+    /// YES when the handle came from WorseQueryAcquire and must be
+    /// released via WorseQueryRelease (same underlying API, but keeps
+    /// the release path explicit and symmetric with acquisition).
+    BOOL _releasedByWorseQuery;
     dispatch_queue_t _invalidateQueue;
 }
 
@@ -202,6 +205,28 @@ BOOL BadQueryBridgeAvailable(void)
     // Patch missing selectors as early as possible — before any
     // ContainerManager code can run.
     BQPatchMissingSelectors();
+}
+
+/// Shared factory for every acquisition path (bad_query success,
+/// worse_query fallback). Owns the per-lease serial invalidate queue and
+/// records which release API matches the handle.
++ (instancetype)leaseWithHandle:(int64_t)handle
+                fromWorseQuery:(BOOL)fromWorseQuery
+                          path:(NSString *)path
+{
+    BadQueryLease *lease = [BadQueryLease new];
+    dispatch_queue_t q = dispatch_queue_create(
+        "com.wesk.vtool.badquery.lease", DISPATCH_QUEUE_SERIAL);
+    dispatch_queue_set_specific(q,
+                                (__bridge const void *)q,
+                                (__bridge void *)lease,
+                                NULL);
+    lease->_invalidateQueue = q;
+    lease->_sandboxHandle = handle;
+    lease->_releasedByWorseQuery = fromWorseQuery;
+    lease.targetPath = path;
+    lease.active = YES;
+    return lease;
 }
 
 + (instancetype)leaseForPath:(NSString *)path error:(NSString **)error
@@ -271,10 +296,30 @@ BOOL BadQueryBridgeAvailable(void)
                         "diagnostics. Path: %@", path];
                     break;
                 case EACCES:
+                case EPERM: {
+                    // lstat is MAC-blocked, but the worse_query Caches-symlink
+                    // escape does not depend on lstat — containermanagerd
+                    // resolves the symlink itself. Fall through to the worse_query
+                    // attempt instead of failing outright.
+                    GKTLLogObjC(@"bad_query lstat pre-check MAC-blocked (errno=%d) — trying worse_query anyway for %@", err, path);
+                    if (WorseQueryBridgeAvailable() && WorseQueryGroupContainerAvailable()) {
+                        NSOperatingSystemVersion v = NSProcessInfo.processInfo.operatingSystemVersion;
+                        BOOL isIOS26 = (v.majorVersion == 26);
+                        int64_t wqHandle = WorseQueryAcquire(path, isIOS26);
+                        if (wqHandle > 0) {
+                            GKTLLogObjC(@"worse_query SUCCEEDED past MAC block for %@ (handle=%lld)", path, (long long)wqHandle);
+                            if (error) *error = nil;
+                            return [BadQueryLease leaseWithHandle:wqHandle
+                                                  fromWorseQuery:YES
+                                                            path:path];
+                        }
+                        GKTLLogObjC(@"worse_query also failed for MAC-blocked %@ (code=%lld)", path, (long long)wqHandle);
+                    }
                     hint = [NSString stringWithFormat:
-                        @"lstat denied (EACCES) for %@. The sandbox is blocking metadata "
-                        "access to this path even before the bad_query query is sent.", path];
+                        @"lstat denied (errno=%d) for %@. The sandbox is blocking metadata "
+                        "access to this path, and worse_query could not obtain a token either.", err, path];
                     break;
+                }
                 default:
                     hint = [NSString stringWithFormat:
                         @"lstat failed for %@ (errno=%d: %s)", path, err, strerror(err)];
@@ -290,16 +335,30 @@ BOOL BadQueryBridgeAvailable(void)
     }
 
     // ── Directory fast-path ───────────────────────────────────────
-    // ContainerManager only issues sandbox extensions for FILE paths,
-    // not DIRECTORY paths. The original bad_query README documents
-    // access to `/var/mobile/Containers/Data/Application/*` (specific
-    // container UUIDs), not the parent directory. Trying all 3 flag
-    // candidates on a directory wastes 3 XPC round-trips that will
-    // always return NULL tokens.
-    //
-    // For directory listing, callers should use fsgetpath (via
-    // bad_query_list_directory) or opendir — neither needs a lease.
+    // ContainerManager's bad_query (class 13 SystemGroup) only issues
+    // sandbox extensions for FILE paths, not DIRECTORY paths — so for
+    // directories we skip straight to worse_query (class 7 appGroup +
+    // Caches symlink escape), which CAN obtain directory tokens (e.g.
+    // /var/containers/Data/System returns handle>0 on iOS 27). This
+    // keeps Phase 2 (lease + opendir) reachable for directory listings
+    // instead of falling through to the fsgetpath inode scan, whose
+    // results are volume-wide and polluted (see bad_query_list_directory).
     if (pathIsDirectory) {
+        if (WorseQueryBridgeAvailable() && WorseQueryGroupContainerAvailable()) {
+            NSOperatingSystemVersion v = NSProcessInfo.processInfo.operatingSystemVersion;
+            BOOL isIOS26 = (v.majorVersion == 26);
+            int64_t wqHandle = WorseQueryAcquire(path, isIOS26);
+            if (wqHandle > 0) {
+                GKTLLogObjC(@"worse_query directory lease SUCCEEDED for %@ (handle=%lld)",
+                            path, (long long)wqHandle);
+                if (error) *error = nil;
+                return [BadQueryLease leaseWithHandle:wqHandle
+                                      fromWorseQuery:YES
+                                                path:path];
+            }
+            GKTLLogObjC(@"worse_query directory lease failed for %@ (code=%lld)",
+                        path, (long long)wqHandle);
+        }
         GKTLLogObjC(@"bad_query skipping lease for directory path: %@", path);
         if (error) *error = [NSString stringWithFormat:
             @"bad_query does not acquire sandbox extensions for directory paths. "
@@ -435,22 +494,51 @@ BOOL BadQueryBridgeAvailable(void)
 
         GKTLLogObjC(@"bad_query SUCCESS with flags=%@ handle=%lld", flagLabel, (long long)handle);
 
-        lease = [BadQueryLease new];
-        lease->_sandboxHandle = handle;
-        dispatch_queue_t q = dispatch_queue_create(
-            "com.wesk.vtool.badquery.lease", DISPATCH_QUEUE_SERIAL);
-        dispatch_queue_set_specific(q,
-                                    (__bridge const void *)q,
-                                    (__bridge void *)lease,
-                                    NULL);
-        lease->_invalidateQueue = q;
-        lease.targetPath = path;
-        lease.active = YES;
+        lease = [BadQueryLease leaseWithHandle:handle
+                               fromWorseQuery:NO
+                                         path:path];
         if (error) *error = nil;
         // Success — break out of the retry loop.
     }
 
     if (!lease) {
+        // ── worse_query fallback ────────────────────────────────────
+        // bad_query (class 13 SystemGroup traversal) exhausted all flag
+        // candidates. Try worse_query (class 7 appGroup + Caches symlink
+        // escape, forcequit 2026) — it works on builds where bad_query
+        // has been neutered (iOS 26.7+/27.2/27.3 beta) and additionally
+        // covers /var/containers/Data/System and other iOS 27 paths.
+        //
+        // Skip when the App Group container is unavailable (entitlement
+        // missing / unregistered group) so we can produce a precise
+        // error below instead of a generic -1.
+        if (WorseQueryBridgeAvailable() && WorseQueryGroupContainerAvailable()) {
+            // Same iOS 26 AppGroup flag quirk as bad_query: alt flags
+            // (0x0800000000) first on 26.x, standard (0x8000000000) on 27.x.
+            NSOperatingSystemVersion v = NSProcessInfo.processInfo.operatingSystemVersion;
+            BOOL isIOS26 = (v.majorVersion == 26);
+
+            int64_t wqHandle = WorseQueryAcquire(path, isIOS26);
+            if (wqHandle > 0) {
+                GKTLLogObjC(@"bad_query failed but worse_query SUCCEEDED for %@ (handle=%lld)",
+                            path, (long long)wqHandle);
+                if (error) *error = nil;
+                return [BadQueryLease leaseWithHandle:wqHandle
+                                      fromWorseQuery:YES
+                                                path:path];
+            }
+            GKTLLogObjC(@"worse_query fallback also failed for %@ (code=%lld)",
+                        path, (long long)wqHandle);
+            lastError = [NSString stringWithFormat:
+                @"bad_query failed and worse_query fallback failed (code %lld). %@",
+                (long long)wqHandle, lastError];
+        } else if (!WorseQueryGroupContainerAvailable()) {
+            lastError = [NSString stringWithFormat:
+                @"%@ (worse_query fallback unavailable: the App Group "
+                @"container is not accessible — check the "
+                @"com.apple.security.application-groups entitlement)",
+                lastError];
+        }
         if (error) *error = lastError;
     }
     return lease;
@@ -461,15 +549,21 @@ BOOL BadQueryBridgeAvailable(void)
     // Capture handle inside the protected block, release outside.
     // Releasing -1 is undefined kernel behavior and can free an unrelated fd.
     __block int64_t handleToRelease = -1;
+    __block BOOL useWorseQueryRelease = NO;
     dispatch_sync(_invalidateQueue, ^{
         if (self.active) {
             handleToRelease = self->_sandboxHandle;
+            useWorseQueryRelease = self->_releasedByWorseQuery;
             self->_sandboxHandle = -1;
             self.active = NO;
         }
     });
     if (handleToRelease >= 0) {
-        BadQuerySharedAPI()->releaseSandboxExtension(handleToRelease);
+        if (useWorseQueryRelease) {
+            WorseQueryRelease(handleToRelease);
+        } else {
+            BadQuerySharedAPI()->releaseSandboxExtension(handleToRelease);
+        }
     }
 }
 
@@ -489,7 +583,11 @@ BOOL BadQueryBridgeAvailable(void)
             // as a valid index if the handle table reuses fd-like
             // integers (some iOS 27 beta builds do).
             if (_sandboxHandle >= 0) {
-                BadQuerySharedAPI()->releaseSandboxExtension(_sandboxHandle);
+                if (_releasedByWorseQuery) {
+                    WorseQueryRelease(_sandboxHandle);
+                } else {
+                    BadQuerySharedAPI()->releaseSandboxExtension(_sandboxHandle);
+                }
                 _sandboxHandle = -1;
             }
         }
@@ -758,7 +856,7 @@ static const FlagProbe kFlagProbes[] = {
 void BadQueryProbeFlags(NSString *targetPath)
 {
     if (!targetPath || !BadQueryBridgeAvailable()) {
-        NSLog(@"[GKTL-ObjC] BadQueryProbeFlags: bridge unavailable or path nil");
+        GKTLLogObjC(@"BadQueryProbeFlags: bridge unavailable or path nil");
         return;
     }
 
@@ -774,19 +872,19 @@ void BadQueryProbeFlags(NSString *targetPath)
     struct stat st;
     const char *pathC = [targetPath fileSystemRepresentation];
     if (!pathC || lstat(pathC, &st) != 0) {
-        NSLog(@"[GKTL-ObjC] BadQueryProbeFlags: lstat failed for %@", targetPath);
+        GKTLLogObjC(@"BadQueryProbeFlags: lstat failed for %@", targetPath);
         return;
     }
 
     NSString *partDomain = [kBadQueryTraversalPrefix stringByAppendingString:queryPath];
     const char *partDomainC = [partDomain fileSystemRepresentation];
     if (!partDomainC) {
-        NSLog(@"[GKTL-ObjC] BadQueryProbeFlags: partDomain encoding failed");
+        GKTLLogObjC(@"BadQueryProbeFlags: partDomain encoding failed");
         return;
     }
 
-    NSLog(@"[GKTL-ObjC] === BadQueryProbeFlags START for %@ ===", targetPath);
-    NSLog(@"[GKTL-ObjC] Probing %zu flag combinations...", sizeof(kFlagProbes)/sizeof(kFlagProbes[0]));
+    GKTLLogObjC(@"=== BadQueryProbeFlags START for %@ ===", targetPath);
+    GKTLLogObjC(@"Probing %zu flag combinations...", sizeof(kFlagProbes)/sizeof(kFlagProbes[0]));
 
     static const int kProbeCount = (int)(sizeof(kFlagProbes) / sizeof(kFlagProbes[0]));
     for (int i = 0; i < kProbeCount; i++) {
@@ -795,7 +893,7 @@ void BadQueryProbeFlags(NSString *targetPath)
 
         void *query = api->create();
         if (!query) {
-            NSLog(@"[GKTL-ObjC] probe[%d] %s (0x%016llx): create() FAILED", i, label, (unsigned long long)flags);
+            GKTLLogObjC(@"probe[%d] %s (0x%016llx): create() FAILED", i, label, (unsigned long long)flags);
             continue;
         }
 
@@ -822,21 +920,21 @@ void BadQueryProbeFlags(NSString *targetPath)
         dispatch_semaphore_wait(sema, to);
 
         if (!completed) {
-            NSLog(@"[GKTL-ObjC] probe[%d] %s (0x%016llx): XPC TIMEOUT", i, label, (unsigned long long)flags);
+            GKTLLogObjC(@"probe[%d] %s (0x%016llx): XPC TIMEOUT", i, label, (unsigned long long)flags);
             // leak query (thread may still reference it)
             continue;
         }
 
         if (!result) {
             api->freeQuery(query);
-            NSLog(@"[GKTL-ObjC] probe[%d] %s (0x%016llx): getSingleResult NULL", i, label, (unsigned long long)flags);
+            GKTLLogObjC(@"probe[%d] %s (0x%016llx): getSingleResult NULL", i, label, (unsigned long long)flags);
             continue;
         }
 
         char *token = api->copySandboxToken(result);
         if (!token) {
             api->freeQuery(query);
-            NSLog(@"[GKTL-ObjC] probe[%d] %s (0x%016llx): token NULL", i, label, (unsigned long long)flags);
+            GKTLLogObjC(@"probe[%d] %s (0x%016llx): token NULL", i, label, (unsigned long long)flags);
             continue;
         }
 
@@ -845,7 +943,7 @@ void BadQueryProbeFlags(NSString *targetPath)
         api->freeQuery(query);
 
         if (handle < 0) {
-            NSLog(@"[GKTL-ObjC] probe[%d] %s (0x%016llx): consume FAILED (handle=%lld)", i, label, (unsigned long long)flags, (long long)handle);
+            GKTLLogObjC(@"probe[%d] %s (0x%016llx): consume FAILED (handle=%lld)", i, label, (unsigned long long)flags, (long long)handle);
             continue;
         }
 
@@ -858,12 +956,12 @@ void BadQueryProbeFlags(NSString *targetPath)
             close(fd);
         }
 
-        NSLog(@"[GKTL-ObjC] probe[%d] %s (0x%016llx): handle=%lld canWrite=%d (open errno=%d: %s)",
+        GKTLLogObjC(@"probe[%d] %s (0x%016llx): handle=%lld canWrite=%d (open errno=%d: %s)",
               i, label, (unsigned long long)flags, (long long)handle, canWrite, openErrno, strerror(openErrno));
 
         // Release the extension
         api->releaseSandboxExtension(handle);
     }
 
-    NSLog(@"[GKTL-ObjC] === BadQueryProbeFlags END ===");
+    GKTLLogObjC(@"=== BadQueryProbeFlags END ===");
 }

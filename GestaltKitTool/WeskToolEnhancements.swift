@@ -191,36 +191,6 @@ enum HapticFeedback {
     }
 }
 
-// MARK: - Change Summary 
-struct ChangeSummary {
-    let enabling: [String]
-    let disabling: [String]
-    let dynamicIslandChange: String?
-    let modelNameChange: String?
-    let aiRegionChange: String?
-
-    var isEmpty: Bool {
-        enabling.isEmpty && disabling.isEmpty
-            && dynamicIslandChange == nil
-            && modelNameChange == nil
-            && aiRegionChange == nil
-    }
-
-    var lines: [String] {
-        var result: [String] = []
-        if !enabling.isEmpty {
-            result.append("+\(enabling.joined(separator: ", "))")
-        }
-        if !disabling.isEmpty {
-            result.append("−\(disabling.joined(separator: ", "))")
-        }
-        if let dynamicIslandChange { result.append(dynamicIslandChange) }
-        if let modelNameChange { result.append(modelNameChange) }
-        if let aiRegionChange { result.append(aiRegionChange) }
-        return result
-    }
-}
-
 // MARK: - Status Report 
 enum StatusReportGenerator {
     static func generate(
